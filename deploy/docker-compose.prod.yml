@@ -1,0 +1,65 @@
+# ============================================================================
+# AI Chief of Staff — self-hosted, single-tenant production stack.
+# Runs entirely on the FOUNDER's infrastructure. No founder data leaves this
+# host except (in LLM_MODE=cloud) prompt content to the founder's own model
+# vendor. See ../docs/llm-inference.md.
+#
+#   cp .env.example .env   # then edit
+#   docker compose -f docker-compose.prod.yml up -d
+#   open http://localhost:${WEB_PORT}
+#
+# Local-only LLM (no third party at all):
+#   set LLM_MODE=local in .env, then add:  --profile local-llm
+# ============================================================================
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - cos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    # IMPORTANT: a single process only. The in-process APScheduler must not be
+    # duplicated across workers, or every founder evaluation would run N times.
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - '8000'
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/frontend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '${WEB_PORT:-8080}:80'
+
+  # Optional fully-local LLM (LLM_MODE=local). Enable with: --profile local-llm
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ['local-llm']
+    restart: unless-stopped
+    volumes:
+      - cos_ollama:/root/.ollama
+    expose:
+      - '11434'
+
+volumes:
+  cos_pgdata:
+  cos_ollama:

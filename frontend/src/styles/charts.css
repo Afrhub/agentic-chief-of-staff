@@ -1,0 +1,159 @@
+/* ---- Pulse panel bento ---- */
+.pulse { --accent-soft: rgba(167, 139, 250, 0.12); }
+.pulse__grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 30px;
+  align-items: center;
+}
+.pulse__main { min-width: 0; }
+.pulse__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 12px;
+}
+.pulse__delta {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--rose);
+  background: rgba(251, 113, 133, 0.12);
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.pulse__side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-left: 26px;
+  border-left: 1px solid var(--hair);
+}
+
+/* ---- Interactive trend chart ---- */
+.chart { position: relative; width: 100%; }
+.chart__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+  cursor: crosshair;
+}
+.chart__line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: chart-draw 1.4s var(--ease) forwards;
+}
+.chart__area { opacity: 0; animation: chart-fade 1s var(--ease) 0.5s forwards; }
+@keyframes chart-draw { to { stroke-dashoffset: 0; } }
+@keyframes chart-fade { to { opacity: 1; } }
+
+.chart__tip {
+  position: absolute;
+  top: -6px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 12px;
+  background: var(--island-bg);
+  border: 1px solid var(--hair-strong);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 12px 30px -16px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}
+.chart__tip-v {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.chart__tip-l { font-size: 0.68rem; color: var(--text-faint); margin-top: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chart__line { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
+  .chart__area { animation: none; opacity: 1; }
+}
+
+/* ---- Donut ---- */
+.donut { position: relative; width: 150px; height: 150px; }
+.donut__svg { width: 100%; height: 100%; }
+.donut__arc {
+  cursor: pointer;
+  transition: stroke-width 0.4s var(--ease), opacity 0.4s var(--ease);
+}
+.donut__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.donut__big {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.7rem;
+  line-height: 1;
+}
+.donut__small {
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  margin-top: 3px;
+  text-transform: capitalize;
+}
+
+.legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  width: 100%;
+}
+.legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.legend__dot { width: 8px; height: 8px; border-radius: 50%; }
+.legend__val { color: var(--text); font-weight: 600; }
+
+/* ---- Sparkline (in alert cards) ---- */
+.spark {
+  display: block;
+  width: 100%;
+  height: 44px;
+  overflow: visible;
+}
+.card__spark {
+  position: relative;
+  margin: 2px 0 20px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--card-inset-bg);
+  border: 1px solid var(--hair);
+}
+.card__spark-k {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--text-faint);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+  .pulse__grid { grid-template-columns: 1fr; gap: 24px; }
+  .pulse__side { padding-left: 0; border-left: none; padding-top: 22px; border-top: 1px solid var(--hair); }
+}

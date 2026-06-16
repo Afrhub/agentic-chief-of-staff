@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg15-latest
+    environment:
+      POSTGRES_USER: chief_user
+      POSTGRES_PASSWORD: chief_password
+      POSTGRES_DB: chief_of_staff
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chief_user -d chief_of_staff"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://chief_user:chief_password@postgres:5432/chief_of_staff
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
+      STRIPE_API_KEY: ${STRIPE_API_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: python main.py
+
+  frontend:
+    image: node:18-alpine
+    working_dir: /app
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm start"
+
+volumes:
+  postgres_data:

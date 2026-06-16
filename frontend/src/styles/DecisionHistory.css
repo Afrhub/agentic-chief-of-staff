@@ -1,0 +1,68 @@
+.history { margin-bottom: 40px; }
+.history .bezel__core { padding: 28px 30px 24px; }
+
+.history__head { margin-bottom: 22px; }
+.history__head h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  margin-top: 10px;
+}
+.history__loading,
+.history__empty {
+  color: var(--text-faint);
+  font-size: 0.9rem;
+  padding: 8px 0;
+}
+
+.trail { list-style: none; position: relative; }
+.trail__item {
+  position: relative;
+  padding: 14px 0 18px 22px;
+}
+.trail__item:not(:last-child) { border-bottom: 1px solid var(--hair); }
+.trail__rail {
+  position: absolute;
+  left: 0; top: 18px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.is-decide   .trail__rail { background: var(--emerald); box-shadow: 0 0 10px var(--emerald); }
+.is-delegate .trail__rail { background: var(--violet);  box-shadow: 0 0 10px var(--violet); }
+.is-dismiss  .trail__rail { background: var(--rose);    box-shadow: 0 0 10px var(--rose); }
+
+.trail__head {
+  display: flex; align-items: baseline; gap: 12px;
+  margin-bottom: 6px;
+}
+.trail__type {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 600;
+  color: var(--text);
+}
+.trail__date { font-size: 0.76rem; color: var(--text-faint); margin-left: auto; }
+.trail__text { color: var(--text-soft); font-size: 0.94rem; line-height: 1.55; }
+.trail__outcome { color: var(--text-dim); font-style: italic; font-size: 0.86rem; margin-top: 5px; }
+.trail__impact {
+  display: inline-block;
+  margin-top: 9px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  border: 1px solid var(--hair);
+}
+.trail__impact.is-positive { color: var(--emerald); background: rgba(52, 214, 165, 0.12); }
+.trail__impact.is-neutral  { color: var(--amber);   background: rgba(245, 185, 69, 0.12); }
+.trail__impact.is-negative { color: var(--rose);    background: rgba(251, 113, 133, 0.12); }
+
+@media (max-width: 768px) {
+  .history .bezel__core { padding: 22px 18px; }
+  .trail__date { margin-left: 0; }
+  .trail__head { flex-wrap: wrap; }
+}
