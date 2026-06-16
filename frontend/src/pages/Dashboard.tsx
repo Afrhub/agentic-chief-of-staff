@@ -48,17 +48,20 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
   }, [theme]);
 
   const fetchAlerts = useCallback(async () => {
+    // Demo founder: load bundled data directly, never touch the network.
+    if (isDemoFounder(founderId)) {
+      setAlerts(DEMO_ALERTS as Alert[]);
+      setLoading(false);
+      return;
+    }
     try {
       const response = await fetch(
         `${API_BASE}/founders/${founderId}/alerts?status=active`
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      setAlerts(data);
+      setAlerts(await response.json());
     } catch (error) {
-      // No backend reachable: show demo data for the demo founder, else empty.
-      if (isDemoFounder(founderId)) setAlerts(DEMO_ALERTS as Alert[]);
-      else console.error('Failed to fetch alerts:', error);
+      console.error('Failed to fetch alerts:', error);
     } finally {
       setLoading(false);
     }
@@ -72,37 +75,22 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
     return () => clearInterval(interval);
   }, [fetchAlerts, demo]);
 
-  // Spring-physics scroll reveal — elements fade/slide/de-blur into view.
-  useEffect(() => {
-    const els = rootRef.current?.querySelectorAll<HTMLElement>('.reveal');
-    if (!els || !els.length) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            e.target.classList.add('reveal--in');
-            io.unobserve(e.target);
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [alerts, showHistory, loading]);
+  // Entrance animation is pure CSS (.reveal keyframes) — no JS/observer,
+  // so a re-render or timing race can never leave the page blank.
 
   // Optimistically remove the acted alert; POST to the API; refetch unless demo.
   const act = async (alertId: string, path: string, body: object, label: string) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== alertId));
+    setAlerts((prev) => prev.filter((a) => a.id !== alertId)); // optimistic
+    if (demo) return; // demo is local-only; nothing to POST
     try {
       await fetch(`${API_BASE}/founders/${founderId}/alerts/${alertId}/${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (!demo) await fetchAlerts();
+      await fetchAlerts();
     } catch (error) {
-      if (!demo) console.error(`Failed to ${label}:`, error);
+      console.error(`Failed to ${label}:`, error);
     }
   };
 
@@ -246,7 +234,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
               <div
                 key={alert.id}
                 className="reveal"
-                style={{ transitionDelay: `${Math.min(i * 90, 360)}ms` }}
+                style={{ animationDelay: `${Math.min(i * 90, 360)}ms` }}
               >
                 <AlertCard
                   alert={alert}

@@ -27,16 +27,19 @@ const DecisionHistory: React.FC<DecisionHistoryProps> = ({ founderId }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchDecisions = useCallback(async () => {
+    if (isDemoFounder(founderId)) {
+      setDecisions(DEMO_DECISIONS as Decision[]);
+      setLoading(false);
+      return;
+    }
     try {
       const response = await fetch(
         `${API_BASE}/founders/${founderId}/decisions?limit=20`
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      setDecisions(data);
+      setDecisions(await response.json());
     } catch (error) {
-      if (isDemoFounder(founderId)) setDecisions(DEMO_DECISIONS as Decision[]);
-      else console.error('Failed to fetch decision history:', error);
+      console.error('Failed to fetch decision history:', error);
     } finally {
       setLoading(false);
     }

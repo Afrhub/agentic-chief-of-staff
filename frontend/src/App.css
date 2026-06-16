@@ -151,23 +151,19 @@ body {
   font-weight: 600;
 }
 
-/* ---- Scroll-reveal motion primitive ---- */
+/* ---- Entrance animation (pure CSS) ----
+   A keyframe animation (not a JS-toggled class) so content ALWAYS ends
+   visible — React re-renders can't strip it, and there's no observer race
+   that could leave the page blank. */
 .reveal {
-  opacity: 0;
-  transform: translateY(26px);
-  filter: blur(10px);
-  transition:
-    opacity 0.9s var(--ease),
-    transform 0.9s var(--ease),
-    filter 0.9s var(--ease);
+  animation: reveal-in 0.8s var(--ease) both;
   will-change: transform, opacity;
 }
-.reveal--in {
-  opacity: 1;
-  transform: translateY(0);
-  filter: blur(0);
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(22px); filter: blur(8px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1; transform: none; filter: none; transition: none; }
+  .reveal { animation: none; }
 }
