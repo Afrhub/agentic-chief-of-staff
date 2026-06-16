@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { API_BASE } from '../config';
+import { DEMO_DECISIONS, isDemoFounder } from '../demo';
 import '../styles/DecisionHistory.css';
 
 interface Decision {
@@ -30,10 +31,12 @@ const DecisionHistory: React.FC<DecisionHistoryProps> = ({ founderId }) => {
       const response = await fetch(
         `${API_BASE}/founders/${founderId}/decisions?limit=20`
       );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       setDecisions(data);
     } catch (error) {
-      console.error('Failed to fetch decision history:', error);
+      if (isDemoFounder(founderId)) setDecisions(DEMO_DECISIONS as Decision[]);
+      else console.error('Failed to fetch decision history:', error);
     } finally {
       setLoading(false);
     }

@@ -78,6 +78,20 @@
 }
 .island__right { display: flex; align-items: center; gap: 10px; }
 
+.demo-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--violet);
+  background: color-mix(in srgb, var(--violet) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--violet) 32%, transparent);
+}
+
 .status-pill {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 14px;

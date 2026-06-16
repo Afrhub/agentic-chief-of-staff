@@ -4,6 +4,7 @@ import DecisionHistory from '../components/DecisionHistory';
 import PulsePanel from '../components/PulsePanel';
 import Tilt from '../components/Tilt';
 import { API_BASE } from '../config';
+import { DEMO_ALERTS, isDemoFounder } from '../demo';
 import '../styles/Dashboard.css';
 import '../styles/fx.css';
 
@@ -34,6 +35,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
     () => (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
   );
   const rootRef = useRef<HTMLDivElement>(null);
+  const demo = isDemoFounder(founderId);
 
   // Apply + persist theme at the document root so every token cascades.
   useEffect(() => {
@@ -50,10 +52,13 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
       const response = await fetch(
         `${API_BASE}/founders/${founderId}/alerts?status=active`
       );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       setAlerts(data);
     } catch (error) {
-      console.error('Failed to fetch alerts:', error);
+      // No backend reachable: show demo data for the demo founder, else empty.
+      if (isDemoFounder(founderId)) setAlerts(DEMO_ALERTS as Alert[]);
+      else console.error('Failed to fetch alerts:', error);
     } finally {
       setLoading(false);
     }
@@ -61,9 +66,11 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
 
   useEffect(() => {
     fetchAlerts();
+    // Demo mode is static (no backend) — don't poll, so optimistic actions stick.
+    if (demo) return;
     const interval = setInterval(fetchAlerts, 5000);
     return () => clearInterval(interval);
-  }, [fetchAlerts]);
+  }, [fetchAlerts, demo]);
 
   // Spring-physics scroll reveal — elements fade/slide/de-blur into view.
   useEffect(() => {
@@ -84,53 +91,28 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
     return () => io.disconnect();
   }, [alerts, showHistory, loading]);
 
-  const handleDecision = async (alertId: string, decisionText: string) => {
+  // Optimistically remove the acted alert; POST to the API; refetch unless demo.
+  const act = async (alertId: string, path: string, body: object, label: string) => {
+    setAlerts((prev) => prev.filter((a) => a.id !== alertId));
     try {
-      await fetch(
-        `${API_BASE}/founders/${founderId}/alerts/${alertId}/decide`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ decision_text: decisionText })
-        }
-      );
-      await fetchAlerts();
+      await fetch(`${API_BASE}/founders/${founderId}/alerts/${alertId}/${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!demo) await fetchAlerts();
     } catch (error) {
-      console.error('Failed to record decision:', error);
+      if (!demo) console.error(`Failed to ${label}:`, error);
     }
   };
 
-  const handleDelegate = async (alertId: string, delegatedTo: string) => {
-    try {
-      await fetch(
-        `${API_BASE}/founders/${founderId}/alerts/${alertId}/delegate`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ delegated_to: delegatedTo })
-        }
-      );
-      await fetchAlerts();
-    } catch (error) {
-      console.error('Failed to delegate:', error);
-    }
-  };
+  const handleDecision = (alertId: string, decisionText: string) =>
+    act(alertId, 'decide', { decision_text: decisionText }, 'record decision');
+  const handleDelegate = (alertId: string, delegatedTo: string) =>
+    act(alertId, 'delegate', { delegated_to: delegatedTo }, 'delegate');
 
-  const handleDismiss = async (alertId: string, reason: string) => {
-    try {
-      await fetch(
-        `${API_BASE}/founders/${founderId}/alerts/${alertId}/dismiss`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason })
-        }
-      );
-      await fetchAlerts();
-    } catch (error) {
-      console.error('Failed to dismiss alert:', error);
-    }
-  };
+  const handleDismiss = (alertId: string, reason: string) =>
+    act(alertId, 'dismiss', { reason }, 'dismiss alert');
 
   // Background mesh parallax — pointer position drives --px/--py on the root.
   const paraFrame = useRef<number | null>(null);
@@ -172,6 +154,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
           <span className="island__name">AI Chief of Staff</span>
         </div>
         <div className="island__right">
+          {demo && <span className="demo-pill">Demo data</span>}
           <span className="status-pill" title="Monitoring active">
             <span className="status-pill__dot" />
             Monitoring · {sourceCount} sources
