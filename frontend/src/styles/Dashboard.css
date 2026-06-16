@@ -217,7 +217,10 @@
   background: var(--shell);
   border: 1px solid var(--hair);
   box-shadow: var(--card-core-inset);
+  transition: transform 0.5s var(--ease), box-shadow 0.5s var(--ease),
+    border-color 0.5s var(--ease);
 }
+.stat:hover { border-color: var(--hair-strong); box-shadow: var(--card-shell-shadow-hover); }
 .stat__num {
   display: block;
   font-family: var(--font-display);

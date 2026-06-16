@@ -26,6 +26,7 @@
   --card-inset-bg: rgba(255, 255, 255, 0.025);
 
   --ring-track: rgba(255, 255, 255, 0.1);
+  --spot: rgba(255, 255, 255, 0.1);
 
   --primary-bg: linear-gradient(180deg, #ffffff, #e6e6ea);
   --primary-fg: #07120d;
@@ -73,6 +74,7 @@
   --card-inset-bg: rgba(15, 18, 35, 0.022);
 
   --ring-track: rgba(15, 18, 35, 0.12);
+  --spot: rgba(15, 18, 35, 0.06);
 
   --primary-bg: linear-gradient(180deg, #1c1d24, #0c0d11);
   --primary-fg: #f6f6f8;

@@ -1,0 +1,79 @@
+/* ============================================================
+   Interaction FX: 3D tilt, cursor spotlight, parallax, pop-out
+   ============================================================ */
+
+.tilt {
+  position: relative;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* Cursor-following spotlight (element + card shading). Sits above the card
+   surface but is non-interactive; fades in only while the pointer is on it. */
+.tilt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 4;
+  background: radial-gradient(
+    340px circle at var(--mx, 50%) var(--my, 50%),
+    var(--spot),
+    transparent 60%
+  );
+  opacity: var(--tilt-on, 0);
+  transition: opacity 0.45s var(--ease);
+}
+
+/* A second, tighter accent glow for alert cards (uses the card's --accent). */
+.tilt.bezel[class*='accent-']::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    420px circle at var(--mx, 50%) var(--my, 50%),
+    color-mix(in srgb, var(--accent) 26%, transparent),
+    transparent 55%
+  );
+  opacity: calc(var(--tilt-on, 0) * 0.7);
+  transition: opacity 0.45s var(--ease);
+}
+
+/* ---- Background mesh parallax (driven by --px/--py on .cos root) ---- */
+.orb {
+  transition: transform 0.5s var(--ease), opacity 0.6s var(--ease);
+}
+.orb--violet  { transform: translate3d(calc(var(--px, 0) * 26px), calc(var(--py, 0) * 26px), 0); }
+.orb--emerald { transform: translate3d(calc(var(--px, 0) * -32px), calc(var(--py, 0) * 20px), 0); }
+.orb--indigo  { transform: translate3d(calc(var(--px, 0) * 18px), calc(var(--py, 0) * -24px), 0); }
+
+/* ---- Micro pop-outs on small elements ---- */
+.fresh__pill,
+.legend__item,
+.type-tag,
+.status-pill {
+  transition: transform 0.35s var(--ease), background 0.35s var(--ease),
+    box-shadow 0.35s var(--ease);
+}
+.fresh__pill:hover {
+  transform: translateY(-2px);
+  background: var(--chip-hover);
+}
+.legend__item:hover { transform: translateY(-2px); }
+.type-tag:hover {
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 6px 18px -8px var(--accent);
+}
+
+/* Confidence ring gives a tiny kick when its card is active */
+.tilt:hover .conf__ring { transform: rotate(-90deg) scale(1.06); }
+.conf__ring { transition: transform 0.45s var(--ease); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt, .tilt::after, .tilt::before, .orb { transition: none; }
+  .tilt::after, .tilt::before { display: none; }
+}

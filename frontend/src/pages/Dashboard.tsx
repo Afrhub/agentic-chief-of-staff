@@ -2,8 +2,10 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import AlertCard from '../components/AlertCard';
 import DecisionHistory from '../components/DecisionHistory';
 import PulsePanel from '../components/PulsePanel';
+import Tilt from '../components/Tilt';
 import { API_BASE } from '../config';
 import '../styles/Dashboard.css';
+import '../styles/fx.css';
 
 interface Alert {
   id: string;
@@ -130,6 +132,20 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
     }
   };
 
+  // Background mesh parallax — pointer position drives --px/--py on the root.
+  const paraFrame = useRef<number | null>(null);
+  const onParallax = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = rootRef.current;
+    if (!el) return;
+    const px = (e.clientX / window.innerWidth - 0.5) * 2;
+    const py = (e.clientY / window.innerHeight - 0.5) * 2;
+    if (paraFrame.current) cancelAnimationFrame(paraFrame.current);
+    paraFrame.current = requestAnimationFrame(() => {
+      el.style.setProperty('--px', px.toFixed(3));
+      el.style.setProperty('--py', py.toFixed(3));
+    });
+  };
+
   const avgConfidence = alerts.length
     ? Math.round(
         (alerts.reduce((s, a) => s + (a.confidence || 0), 0) / alerts.length) * 100
@@ -140,7 +156,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
     : 4;
 
   return (
-    <div className="cos" ref={rootRef}>
+    <div className="cos" ref={rootRef} onMouseMove={onParallax}>
       {/* Ambient mesh background */}
       <div className="cos__mesh" aria-hidden="true">
         <span className="orb orb--violet" />
@@ -206,18 +222,18 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
           </p>
 
           <div className="stat-strip">
-            <div className="stat">
+            <Tilt className="stat" max={8} lift={4}>
               <span className="stat__num">{loading ? '—' : alerts.length}</span>
               <span className="stat__label">Active decisions</span>
-            </div>
-            <div className="stat">
+            </Tilt>
+            <Tilt className="stat" max={8} lift={4}>
               <span className="stat__num">{loading ? '—' : `${avgConfidence}%`}</span>
               <span className="stat__label">Avg. confidence</span>
-            </div>
-            <div className="stat">
+            </Tilt>
+            <Tilt className="stat" max={8} lift={4}>
               <span className="stat__num">{sourceCount}</span>
               <span className="stat__label">Live sources</span>
-            </div>
+            </Tilt>
           </div>
         </section>
 

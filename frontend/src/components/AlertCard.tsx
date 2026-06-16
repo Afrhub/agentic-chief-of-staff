@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Sparkline from './charts/Sparkline';
+import Tilt from './Tilt';
 import '../styles/AlertCard.css';
 
 interface Alert {
@@ -70,7 +71,7 @@ const AlertCard: React.FC<AlertCardProps> = ({
       : 'Why dismiss? (optional)';
 
   return (
-    <article className={`bezel accent-${meta.accent}`}>
+    <Tilt className={`bezel accent-${meta.accent}`} max={4} lift={8}>
       <div className="bezel__core">
         <span className="bezel__sheen" aria-hidden="true" />
 
@@ -193,7 +194,7 @@ const AlertCard: React.FC<AlertCardProps> = ({
           Triggered {new Date(alert.triggered_at).toLocaleString()}
         </div>
       </div>
-    </article>
+    </Tilt>
   );
 };
 

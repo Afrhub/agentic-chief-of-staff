@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import TrendChart, { TrendPoint } from './charts/TrendChart';
 import Donut, { DonutSegment } from './charts/Donut';
+import Tilt from './Tilt';
 import '../styles/charts.css';
 
 interface PulseAlert {
@@ -52,7 +53,7 @@ const PulsePanel: React.FC<PulsePanelProps> = ({ alerts }) => {
   }, [alerts]);
 
   return (
-    <div className="bezel pulse">
+    <Tilt className="bezel pulse" max={3} lift={5}>
       <div className="bezel__core">
         <span className="bezel__sheen" aria-hidden="true" />
         <div className="pulse__grid">
@@ -79,7 +80,7 @@ const PulsePanel: React.FC<PulsePanelProps> = ({ alerts }) => {
           </section>
         </div>
       </div>
-    </div>
+    </Tilt>
   );
 };
 
