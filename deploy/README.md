@@ -1,4 +1,4 @@
-# Self-Hosted Install — AI Chief of Staff (Phase 2)
+# Self-Hosted Install — dCernment (Phase 2)
 
 Run the entire product on **your own** infrastructure. Your business data —
 signals, alerts, decisions, memory, OAuth tokens — lives only in this stack and

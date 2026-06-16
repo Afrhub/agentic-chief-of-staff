@@ -1,4 +1,4 @@
-# AI Chief of Staff for Founders — SaaS Product Doctrine
+# dCernment for Founders — SaaS Product Doctrine
 
 This document defines what we're building, why, and how we know it's done.
 

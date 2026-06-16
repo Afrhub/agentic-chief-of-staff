@@ -20,7 +20,7 @@ from integrations.calendar_adapter import CalendarAdapter
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="AI Chief of Staff")
+app = FastAPI(title="dCernment")
 
 app.add_middleware(
     CORSMiddleware,
