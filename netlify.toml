@@ -1,0 +1,10 @@
+# Netlify build config — builds the CRA frontend and publishes the static bundle.
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "build"
+
+[build.environment]
+  CI = "false"   # don't treat lint warnings as hard errors in CI build
+
+# SPA routing + cache headers also live in frontend/public/_redirects & _headers
