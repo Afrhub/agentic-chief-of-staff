@@ -16,6 +16,7 @@ from integrations.slack_adapter import SlackAdapter
 from integrations.stripe_adapter import StripeAdapter
 from integrations.email_adapter import EmailAdapter
 from integrations.calendar_adapter import CalendarAdapter
+from integrations.granola_adapter import GranolaAdapter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -244,10 +245,31 @@ def _collect_slack_signals(founder_id: str, state: IntegrationState, db: Session
     return signals
 
 
+def _collect_granola_signals(founder_id: str, state: IntegrationState, db: Session) -> List[AlertSignal]:
+    """Collect decision/action/risk signals from recent Granola meeting notes."""
+    signals: List[AlertSignal] = []
+    adapter = GranolaAdapter(
+        state.access_token,
+        (state.config or {}).get("base_url") or "https://public-api.granola.ai/v1",
+    )
+    for note in adapter.scan_recent_notes():
+        signals.append(AlertSignal(
+            type=note["kind"],
+            confidence=0.8,
+            timestamp=note["timestamp"],
+            data=note,
+        ))
+    state.last_sync_at = datetime.utcnow()
+    state.last_sync_status = "success"
+    state.last_error = None
+    return signals
+
+
 _COLLECTORS = {
     "stripe": _collect_stripe_signals,
     "email": _collect_email_signals,
     "slack": _collect_slack_signals,
+    "granola": _collect_granola_signals,
 }
 
 

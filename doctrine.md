@@ -1,4 +1,4 @@
-# dCernment for Founders — SaaS Product Doctrine
+# AI Chief of Staff for Founders — SaaS Product Doctrine
 
 This document defines what we're building, why, and how we know it's done.
 
@@ -296,6 +296,53 @@ A build is **done and correct** when all of the following are true:
 
 ---
 
-**Doctrine version:** 1.0  
-**Last updated:** 2026-06-16  
-**Status:** Ready for implementation
+## v2 — Chief of Staff Agent (the interactive tier)
+
+v1 is the **advisory** half of a chief of staff: it watches and surfaces decisions. v2 adds the **interactive** half: a chief of staff the founder *talks to and delegates to*. Same engine, new front door.
+
+### What it is
+A conversational agent with read access to the founder's connected tools and memory. The founder asks; it answers, prepares, and drafts:
+- "What's our churn story for the board?" → queries Stripe + support + Slack, returns a synthesized answer.
+- "Draft the reply to the Sequoia partner." → composes the email, shows it, waits for approval.
+- "Push back on my Q3 hiring plan." → thought-partner: surfaces the counter-case, blind spots, precedents from memory.
+
+### Build (reuses v1 — this is assembly, not new infrastructure)
+1. **Chat endpoint** (`POST /founders/{id}/chat`) running an agentic loop (LLM + tool calls) over the **existing adapters as read-only tools** (Stripe, Slack, email, calendar) and the **existing pgvector memory** for context/precedents.
+2. **Chat panel** in the dashboard (reuse the design system + theming).
+3. **Draft-don't-send actions**: the agent composes email/Slack/calendar artifacts and renders them for **approve-before-send** — the same guardrail as v1's Decide/Delegate/Dismiss. Nothing leaves without a click.
+
+### Scope — IN
+- Conversational Q&A over the founder's data.
+- On-demand research/synthesis using the read-only tools + memory.
+- Drafting (email, Slack, calendar invites, decision memos) — **always to a draft/approval state**.
+- Per-founder memory of style and past decisions (already in v1's semantic layer).
+
+### Scope — OUT (still, deliberately)
+- **Autonomous send/execute.** Approve-before-send stays. This is the guardrail that the refuted "fully autonomous" Apex claims ignored — keeping it is the liability firewall.
+- Acting across other people's accounts (team-wide actions) — founder-scoped only, as in v1.
+
+### Packaging & price (anchors to validate, not fixed)
+- **+ AI Chief of Staff (SaaS):** $999–$2,000/mo — anchored to a human CoS salary ($150k–$250k/yr), not to dashboard tools.
+- **White-glove / self-hosted CoS:** $3k–$5k/mo or $40k–$60k/yr — single-tenant on the client's infra. High-touch **service** tier (onboarding, tuning, support): expect a handful of clients, long sales cycle — not auto-scaling SaaS.
+
+### LLM / "data never leaves" (carry over from docs/llm-inference.md)
+- **Default = the client's own cloud LLM account** (zero-retention): frontier quality, and "only the vendor you already trust sees it, never us" satisfies ~95% of privacy-sensitive buyers.
+- **Local-model mode** (`LLM_MODE=local`) reserved for true air-gap buyers who accept the quality + GPU tradeoff. Local 70B-class is good enough for triage/summarize/draft; frontier still wins on the hardest judgment — re-test at build time, it moves fast.
+
+### Definition of Done (v2 agent tier)
+- [ ] Founder can hold a multi-turn conversation that pulls live context from ≥3 connected tools.
+- [ ] Agent retrieves relevant past decisions from memory and cites them.
+- [ ] Every outbound artifact (email/Slack/invite) lands in an **approval state** — zero auto-send, verified.
+- [ ] Token cost per active founder stays well under the tier price (metered).
+- [ ] Self-hosted build runs the agent loop with `LLM_MODE` cloud **or** local, no code change.
+
+### Open questions
+1. Memory boundary — what's the agent allowed to recall vs. forget (sensitive investor/team notes)?
+2. Proactive vs. reactive — does the agent only respond, or also initiate ("you haven't replied to X")? (Ties to v1 open question #2.)
+3. Pricing model — flat tier vs. usage-metered once token cost is known.
+
+---
+
+**Doctrine version:** 1.1  
+**Last updated:** 2026-06-18  
+**Status:** v1 ready for implementation · v2 (CoS agent) specced, not built
