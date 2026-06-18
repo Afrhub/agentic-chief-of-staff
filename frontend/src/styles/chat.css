@@ -119,8 +119,38 @@
 .src__msg { margin-top: 10px; font-size: 0.85rem; color: var(--emerald); }
 .src__hint { margin-top: 8px; font-size: 0.78rem; color: var(--text-faint); }
 
+/* Drafts */
+.draft__make { margin-bottom: 16px; }
+.draft__chan {
+  padding: 12px 12px;
+  border-radius: 12px;
+  background: var(--chip-bg);
+  border: 1px solid var(--hair-strong);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+}
+.draft__list { display: flex; flex-direction: column; gap: 14px; }
+.draft__card {
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--card-inset-bg);
+  border: 1px solid var(--hair);
+}
+.draft__meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.draft__chip {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600;
+  padding: 3px 9px; border-radius: 999px;
+  color: var(--violet); background: rgba(167, 139, 250, 0.14);
+}
+.draft__to { font-size: 0.8rem; color: var(--text-faint); }
+.draft__subject { font-family: var(--font-display); font-weight: 600; font-size: 1rem; margin-bottom: 6px; }
+.draft__body { color: var(--text-soft); font-size: 0.92rem; line-height: 1.6; white-space: pre-line; margin-bottom: 14px; }
+.draft__actions { display: flex; gap: 10px; }
+
 @media (max-width: 768px) {
   .chat .bezel__core, .integrations .bezel__core { padding: 18px 16px; }
   .chat__msg { max-width: 92%; }
   .chat__input { flex-direction: column; align-items: stretch; }
+  .draft__actions { flex-direction: column; }
 }

@@ -17,7 +17,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from database import init_db, get_db, SessionLocal
-from schema import Founder, Alert, Decision, IntegrationState
+from schema import Founder, Alert, Decision, IntegrationState, Draft
 from coordinator import CoordinatorAgent, CoordinatorState, AlertSignal
 from integrations.slack_adapter import SlackAdapter
 from integrations.stripe_adapter import StripeAdapter
@@ -75,6 +75,12 @@ class ChatRequest(BaseModel):
 class ConnectRequest(BaseModel):
     access_token: str
     config: Optional[dict] = None
+
+
+class DraftRequest(BaseModel):
+    instruction: str
+    channel: str = "email"          # email | slack
+    recipient: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -568,6 +574,99 @@ def chat(founder_id: str, body: ChatRequest, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"chat failed: {e}")
         raise HTTPException(status_code=503, detail="assistant unavailable")
+
+
+def _generate_draft(founder_id: str, instruction: str, channel: str, db: Session) -> dict:
+    """Ask the LLM to write a draft message. Returns {subject, body}."""
+    prompt = (
+        f"You are the founder's chief of staff. Draft a {channel} message for the "
+        f"request below. Concise, professional, ready to send. Return EXACTLY:\n"
+        f"SUBJECT: <one line; 'N/A' for slack>\nBODY: <message>\n\n"
+        f"Request: {instruction}"
+    )
+    coordinator_agent.memory_db = db
+    raw = coordinator_agent._call_with_fallback(prompt)
+
+    subject, body, section = "", "", None
+    for line in raw.splitlines():
+        if line.startswith("SUBJECT:"):
+            section = "s"; subject = line[8:].strip()
+        elif line.startswith("BODY:"):
+            section = "b"; body = line[5:].strip()
+        elif section == "b":
+            body += "\n" + line
+    return {"subject": subject, "body": body.strip() or raw.strip()}
+
+
+def _draft_dict(d: Draft) -> dict:
+    return {
+        "id": d.id, "channel": d.channel, "recipient": d.recipient,
+        "subject": d.subject, "body": d.body, "status": d.status,
+        "instruction": d.instruction, "created_at": d.created_at.isoformat(),
+    }
+
+
+@app.post("/founders/{founder_id}/drafts")
+def create_draft(founder_id: str, body: DraftRequest, db: Session = Depends(get_db)):
+    """Generate a draft (email/slack) for approval. Nothing is sent here."""
+    founder = db.query(Founder).filter(Founder.id == founder_id).first()
+    if not founder:
+        raise HTTPException(status_code=404, detail="Founder not found")
+    try:
+        gen = _generate_draft(founder_id, body.instruction, body.channel, db)
+    except Exception as e:
+        logger.error(f"draft generation failed: {e}")
+        raise HTTPException(status_code=503, detail="assistant unavailable")
+
+    draft = Draft(
+        founder_id=founder_id, channel=body.channel, recipient=body.recipient,
+        subject=gen["subject"], body=gen["body"], instruction=body.instruction,
+    )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+    return _draft_dict(draft)
+
+
+@app.get("/founders/{founder_id}/drafts")
+def list_drafts(founder_id: str, status: str = "pending", db: Session = Depends(get_db)):
+    rows = db.query(Draft).filter(
+        Draft.founder_id == founder_id, Draft.status == status
+    ).order_by(Draft.created_at.desc()).limit(50).all()
+    return [_draft_dict(d) for d in rows]
+
+
+@app.post("/founders/{founder_id}/drafts/{draft_id}/approve")
+def approve_draft(founder_id: str, draft_id: str, db: Session = Depends(get_db)):
+    """Approve a draft. Slack drafts with a recipient are actually sent; email
+    drafts are marked approved (SMTP/Gmail send is the next rung)."""
+    draft = db.query(Draft).filter(
+        Draft.id == draft_id, Draft.founder_id == founder_id
+    ).first()
+    if not draft:
+        raise HTTPException(status_code=404, detail="Draft not found")
+
+    draft.approved_at = datetime.utcnow()
+    if draft.channel == "slack" and draft.recipient and os.getenv("SLACK_BOT_TOKEN"):
+        sent = SlackAdapter(os.getenv("SLACK_BOT_TOKEN")).post_message(draft.recipient, draft.body)
+        draft.status = "sent" if sent else "approved"
+    else:
+        # ponytail: email send (SMTP/Gmail) not wired yet — approved = ready to send.
+        draft.status = "approved"
+    db.commit()
+    return {"id": draft.id, "status": draft.status}
+
+
+@app.post("/founders/{founder_id}/drafts/{draft_id}/discard")
+def discard_draft(founder_id: str, draft_id: str, db: Session = Depends(get_db)):
+    draft = db.query(Draft).filter(
+        Draft.id == draft_id, Draft.founder_id == founder_id
+    ).first()
+    if not draft:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    draft.status = "discarded"
+    db.commit()
+    return {"id": draft.id, "status": "discarded"}
 
 
 def _verify_slack(raw: bytes, ts: str, sig: str) -> bool:

@@ -4,6 +4,7 @@ import DecisionHistory from '../components/DecisionHistory';
 import PulsePanel from '../components/PulsePanel';
 import ChatPanel from '../components/ChatPanel';
 import Integrations from '../components/Integrations';
+import Drafts from '../components/Drafts';
 import Tilt from '../components/Tilt';
 import { API_BASE } from '../config';
 import { DEMO_ALERTS, isDemoFounder } from '../demo';
@@ -35,6 +36,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
   const [showHistory, setShowHistory] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showSources, setShowSources] = useState(false);
+  const [showDrafts, setShowDrafts] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(
     () => (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
   );
@@ -172,6 +174,10 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
             <span className="theme-toggle__thumb" aria-hidden="true" />
           </button>
 
+          <button className="ghost-pill" onClick={() => setShowDrafts((v) => !v)}>
+            {showDrafts ? 'Hide drafts' : 'Drafts'}
+            <span className="ghost-pill__icon" aria-hidden="true">{showDrafts ? '×' : '↗'}</span>
+          </button>
           <button className="ghost-pill" onClick={() => setShowSources((v) => !v)}>
             {showSources ? 'Hide sources' : 'Sources'}
             <span className="ghost-pill__icon" aria-hidden="true">{showSources ? '×' : '↗'}</span>
@@ -219,6 +225,12 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
         {!loading && alerts.length > 0 && (
           <div className="reveal pulse-wrap">
             <PulsePanel alerts={alerts} />
+          </div>
+        )}
+
+        {showDrafts && (
+          <div className="reveal">
+            <Drafts founderId={founderId} />
           </div>
         )}
 

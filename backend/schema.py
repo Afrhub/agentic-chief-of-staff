@@ -133,3 +133,20 @@ class LangGraphCheckpoint(Base):
 
     checkpoint_at = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Draft(Base):
+    __tablename__ = "drafts"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    founder_id = Column(String, ForeignKey("founders.id"), nullable=False)
+
+    channel = Column(String, nullable=False)      # email | slack
+    recipient = Column(String, nullable=True)     # email addr or slack channel/user
+    subject = Column(String, nullable=True)
+    body = Column(Text, nullable=False)
+
+    status = Column(String, default="pending")    # pending | approved | sent | discarded
+    instruction = Column(Text, nullable=True)     # what the founder asked for
+    created_at = Column(DateTime, default=datetime.utcnow)
+    approved_at = Column(DateTime, nullable=True)
