@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -10,6 +10,9 @@ import hmac
 import hashlib
 import time
 import json
+import base64
+import httpx
+from urllib.parse import parse_qsl
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -625,6 +628,67 @@ async def slack_events(request: Request, background: BackgroundTasks, db: Sessio
             background.add_task(_slack_reply_worker, founder.id, channel, text)
 
     return {"ok": True}  # ack fast; reply happens in the background
+
+
+def _verify_twilio(url: str, params: dict, signature: str) -> bool:
+    """Verify Twilio's X-Twilio-Signature (trust boundary). Algorithm: base64(
+    HMAC-SHA1(auth_token, url + concatenated sorted key+value pairs))."""
+    token = os.getenv("TWILIO_AUTH_TOKEN")
+    if not token:
+        logger.warning("TWILIO_AUTH_TOKEN unset — skipping WhatsApp signature check (set it in prod)")
+        return True  # ponytail: dev fallback only; required once the number is live
+    base = url + "".join(f"{k}{params[k]}" for k in sorted(params))
+    mac = base64.b64encode(hmac.new(token.encode(), base.encode(), hashlib.sha1).digest()).decode()
+    return hmac.compare_digest(mac, signature or "")
+
+
+def _twilio_send_whatsapp(to: str, body: str):
+    """Send a WhatsApp message via Twilio REST (httpx, no SDK)."""
+    sid = os.getenv("TWILIO_ACCOUNT_SID")
+    token = os.getenv("TWILIO_AUTH_TOKEN")
+    sender = os.getenv("TWILIO_WHATSAPP_FROM")  # e.g. "whatsapp:+14155238886"
+    if not (sid and token and sender):
+        logger.error("Twilio env (SID/TOKEN/FROM) incomplete — cannot send WhatsApp reply")
+        return
+    httpx.post(
+        f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json",
+        auth=(sid, token),
+        data={"From": sender, "To": to, "Body": body[:1500]},
+        timeout=20,
+    )
+
+
+def _whatsapp_reply_worker(founder_id: str, to: str, message: str):
+    """Background: run the chief-of-staff brain and WhatsApp the reply back."""
+    db = SessionLocal()
+    try:
+        reply = _chief_of_staff_reply(founder_id, message, db)
+        _twilio_send_whatsapp(to, reply)
+    except Exception as e:
+        logger.error(f"WhatsApp reply worker failed: {e}")
+    finally:
+        db.close()
+
+
+@app.post("/whatsapp/events")
+async def whatsapp_events(request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
+    """Twilio WhatsApp inbound webhook: a founder messages the number → chief of
+    staff replies. Reachable with no browser open. Acks fast (empty TwiML),
+    replies in the background to avoid Twilio's webhook timeout."""
+    raw = await request.body()
+    form = dict(parse_qsl(raw.decode()))  # stdlib parse — no python-multipart dep
+    if not _verify_twilio(str(request.url), form, request.headers.get("X-Twilio-Signature", "")):
+        raise HTTPException(status_code=403, detail="bad signature")
+
+    sender = form.get("From", "")           # "whatsapp:+14155551234"
+    text = (form.get("Body") or "").strip()
+    number = sender.replace("whatsapp:", "")
+    founder = db.query(Founder).filter(Founder.whatsapp_number == number).first()
+    if founder and text:
+        background.add_task(_whatsapp_reply_worker, founder.id, sender, text)
+
+    # Empty TwiML ack — the real reply is sent async via the REST API.
+    return Response(content="<Response></Response>", media_type="application/xml")
 
 
 @app.post("/slack/actions")

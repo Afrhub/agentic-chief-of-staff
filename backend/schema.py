@@ -14,6 +14,7 @@ class Founder(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String, unique=True, nullable=False)
     slack_user_id = Column(String, nullable=True)
+    whatsapp_number = Column(String, nullable=True)  # e.g. "+14155551234" (maps inbound WhatsApp)
     stripe_account_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
