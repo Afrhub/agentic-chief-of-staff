@@ -9,6 +9,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# OAuth scopes the email integration must request: read inbound (signals) + send
+# (approved drafts). Wire these into the Google OAuth consent flow.
+GMAIL_SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+]
+
 
 class EmailAdapter:
     """Adapter for email: IMAP read + Gmail API send."""
