@@ -1,20 +1,51 @@
 import imaplib
 import email
 from email.header import decode_header
+from email.mime.text import MIMEText
 from datetime import datetime, timedelta
+import base64
+import os
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class EmailAdapter:
-    """Adapter for email (IMAP) integration."""
+    """Adapter for email: IMAP read + Gmail API send."""
 
-    def __init__(self, email_address: str, imap_token: str, imap_server: str = "imap.gmail.com"):
+    def __init__(self, email_address: str, imap_token: str, imap_server: str = "imap.gmail.com",
+                 refresh_token: str = None):
         self.email_address = email_address
         self.imap_token = imap_token
         self.imap_server = imap_server
+        self.refresh_token = refresh_token
         self.important_senders = set()  # Will populate with known VIPs
+
+    def send_via_gmail(self, to: str, subject: str, body: str) -> bool:
+        """Send an email via the Gmail API using the founder's OAuth token.
+        Requires the token to carry the gmail.send scope."""
+        try:
+            from googleapiclient.discovery import build
+            from google.oauth2.credentials import Credentials
+
+            creds = Credentials(
+                token=self.imap_token,
+                refresh_token=self.refresh_token,
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=os.getenv("GOOGLE_CLIENT_ID"),
+                client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+            )
+            service = build("gmail", "v1", credentials=creds)
+            msg = MIMEText(body)
+            msg["to"] = to
+            msg["from"] = self.email_address or "me"
+            msg["subject"] = subject or "(no subject)"
+            raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+            service.users().messages().send(userId="me", body={"raw": raw}).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Gmail send failed: {e}")
+            return False
 
     def _connect(self) -> imaplib.IMAP4_SSL:
         """Connect to IMAP server."""

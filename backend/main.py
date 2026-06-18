@@ -563,13 +563,29 @@ def _chief_of_staff_reply(founder_id: str, message: str, db: Session) -> str:
     return coordinator_agent._call_with_fallback(prompt)
 
 
+_DRAFT_INTENT = ("draft", "write a", "write an", "reply to", "compose", "send a message", "send an email")
+
+
+def _wants_draft(msg: str) -> bool:
+    m = msg.lower()
+    return any(k in m for k in _DRAFT_INTENT)  # ponytail: keyword intent; LLM-classify later
+
+
 @app.post("/founders/{founder_id}/chat")
 def chat(founder_id: str, body: ChatRequest, db: Session = Depends(get_db)):
-    """Conversational chief of staff (web)."""
+    """Conversational chief of staff (web). If the founder asks for a draft, the
+    chat generates one (pending approval in Drafts) instead of just replying."""
     founder = db.query(Founder).filter(Founder.id == founder_id).first()
     if not founder:
         raise HTTPException(status_code=404, detail="Founder not found")
     try:
+        if _wants_draft(body.message):
+            channel = "slack" if "slack" in body.message.lower() else "email"
+            draft = _persist_draft(founder_id, body.message, channel, None, db)
+            return {
+                "reply": f"✍️ I drafted a {channel} message — review and approve it in **Drafts**.",
+                "draft_id": draft.id,
+            }
         return {"reply": _chief_of_staff_reply(founder_id, body.message, db)}
     except Exception as e:
         logger.error(f"chat failed: {e}")
@@ -606,6 +622,19 @@ def _draft_dict(d: Draft) -> dict:
     }
 
 
+def _persist_draft(founder_id: str, instruction: str, channel: str, recipient, db: Session) -> Draft:
+    """Generate + save a pending draft. Shared by the /drafts endpoint and chat."""
+    gen = _generate_draft(founder_id, instruction, channel, db)
+    draft = Draft(
+        founder_id=founder_id, channel=channel, recipient=recipient,
+        subject=gen["subject"], body=gen["body"], instruction=instruction,
+    )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+    return draft
+
+
 @app.post("/founders/{founder_id}/drafts")
 def create_draft(founder_id: str, body: DraftRequest, db: Session = Depends(get_db)):
     """Generate a draft (email/slack) for approval. Nothing is sent here."""
@@ -613,19 +642,10 @@ def create_draft(founder_id: str, body: DraftRequest, db: Session = Depends(get_
     if not founder:
         raise HTTPException(status_code=404, detail="Founder not found")
     try:
-        gen = _generate_draft(founder_id, body.instruction, body.channel, db)
+        return _draft_dict(_persist_draft(founder_id, body.instruction, body.channel, body.recipient, db))
     except Exception as e:
         logger.error(f"draft generation failed: {e}")
         raise HTTPException(status_code=503, detail="assistant unavailable")
-
-    draft = Draft(
-        founder_id=founder_id, channel=body.channel, recipient=body.recipient,
-        subject=gen["subject"], body=gen["body"], instruction=body.instruction,
-    )
-    db.add(draft)
-    db.commit()
-    db.refresh(draft)
-    return _draft_dict(draft)
 
 
 @app.get("/founders/{founder_id}/drafts")
@@ -647,12 +667,21 @@ def approve_draft(founder_id: str, draft_id: str, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Draft not found")
 
     draft.approved_at = datetime.utcnow()
+    sent = False
     if draft.channel == "slack" and draft.recipient and os.getenv("SLACK_BOT_TOKEN"):
         sent = SlackAdapter(os.getenv("SLACK_BOT_TOKEN")).post_message(draft.recipient, draft.body)
-        draft.status = "sent" if sent else "approved"
-    else:
-        # ponytail: email send (SMTP/Gmail) not wired yet — approved = ready to send.
-        draft.status = "approved"
+    elif draft.channel == "email" and draft.recipient:
+        email_state = db.query(IntegrationState).filter(
+            IntegrationState.founder_id == founder_id, IntegrationState.service == "email"
+        ).first()
+        if email_state:
+            adapter = EmailAdapter(
+                email_address=(email_state.config or {}).get("email"),
+                imap_token=email_state.access_token,
+                refresh_token=email_state.refresh_token,
+            )
+            sent = adapter.send_via_gmail(draft.recipient, draft.subject or "(no subject)", draft.body)
+    draft.status = "sent" if sent else "approved"  # approved = ready (no recipient/integration)
     db.commit()
     return {"id": draft.id, "status": draft.status}
 
