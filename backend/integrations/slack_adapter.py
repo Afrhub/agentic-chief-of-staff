@@ -15,6 +15,15 @@ class SlackAdapter:
         self.escalation_keywords = ["urgent", "blocked", "stuck", "critical", "asap", "emergency", "help"]
         self.conflict_keywords = ["disagree", "conflict", "issue", "problem", "angry", "upset", "frustrated"]
 
+    def post_message(self, channel: str, text: str) -> bool:
+        """Post a plain text message (used by the chief-of-staff Slack bot)."""
+        try:
+            self.client.chat_postMessage(channel=channel, text=text)
+            return True
+        except SlackApiError as e:
+            logger.error(f"Slack post_message error: {e}")
+            return False
+
     def post_alert(self, channel: str, alert_payload: dict) -> bool:
         """Post a formatted alert to Slack."""
         try:

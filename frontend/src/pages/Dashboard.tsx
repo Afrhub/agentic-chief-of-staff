@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import AlertCard from '../components/AlertCard';
 import DecisionHistory from '../components/DecisionHistory';
 import PulsePanel from '../components/PulsePanel';
+import ChatPanel from '../components/ChatPanel';
+import Integrations from '../components/Integrations';
 import Tilt from '../components/Tilt';
 import { API_BASE } from '../config';
 import { DEMO_ALERTS, isDemoFounder } from '../demo';
@@ -31,6 +33,8 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [showSources, setShowSources] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(
     () => (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
   );
@@ -168,6 +172,10 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
             <span className="theme-toggle__thumb" aria-hidden="true" />
           </button>
 
+          <button className="ghost-pill" onClick={() => setShowSources((v) => !v)}>
+            {showSources ? 'Hide sources' : 'Sources'}
+            <span className="ghost-pill__icon" aria-hidden="true">{showSources ? '×' : '↗'}</span>
+          </button>
           <button
             className="ghost-pill"
             onClick={() => setShowHistory((v) => !v)}
@@ -214,6 +222,12 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
           </div>
         )}
 
+        {showSources && (
+          <div className="reveal">
+            <Integrations founderId={founderId} />
+          </div>
+        )}
+
         {showHistory && (
           <div className="reveal">
             <DecisionHistory founderId={founderId} />
@@ -253,6 +267,29 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
           Syncing every 5 minutes · last updated {new Date().toLocaleTimeString()}
         </footer>
       </main>
+
+      {/* Floating chief-of-staff launcher (always bottom-right) */}
+      {showChat && (
+        <div className="chat-dock">
+          <ChatPanel founderId={founderId} />
+        </div>
+      )}
+      <button
+        className="fab"
+        onClick={() => setShowChat((v) => !v)}
+        aria-label={showChat ? 'Close chief of staff' : 'Ask your chief of staff'}
+        title="Ask your chief of staff"
+      >
+        {showChat ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z" />
+          </svg>
+        )}
+      </button>
     </div>
   );
 };

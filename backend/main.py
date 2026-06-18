@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -6,6 +6,10 @@ from typing import Optional, List
 from datetime import datetime
 import logging
 import os
+import hmac
+import hashlib
+import time
+import json
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -58,6 +62,16 @@ class DismissRequest(BaseModel):
 
 class AlertCreateRequest(BaseModel):
     signals: List[dict]
+
+
+class ChatRequest(BaseModel):
+    message: str
+    history: Optional[List[dict]] = None  # [{role, content}], optional
+
+
+class ConnectRequest(BaseModel):
+    access_token: str
+    config: Optional[dict] = None
 
 
 # ---------------------------------------------------------------------------
@@ -468,6 +482,149 @@ def get_decision_history(founder_id: str, limit: int = 20, db: Session = Depends
         }
         for d in decisions
     ]
+
+
+@app.get("/founders/{founder_id}/integrations")
+def list_integrations(founder_id: str, db: Session = Depends(get_db)):
+    """List connected integrations + sync status (for the Connect UI)."""
+    rows = db.query(IntegrationState).filter(
+        IntegrationState.founder_id == founder_id
+    ).all()
+    return [
+        {
+            "service": r.service,
+            "status": r.last_sync_status,
+            "last_sync_at": r.last_sync_at.isoformat() if r.last_sync_at else None,
+            "error": r.last_error,
+        }
+        for r in rows
+    ]
+
+
+@app.post("/founders/{founder_id}/integrations/{service}")
+def connect_integration(founder_id: str, service: str, body: ConnectRequest, db: Session = Depends(get_db)):
+    """Connect (or update) an integration by storing its API key. Upsert by (founder, service)."""
+    founder = db.query(Founder).filter(Founder.id == founder_id).first()
+    if not founder:
+        raise HTTPException(status_code=404, detail="Founder not found")
+
+    row = db.query(IntegrationState).filter(
+        IntegrationState.founder_id == founder_id,
+        IntegrationState.service == service,
+    ).first()
+    if row:
+        row.access_token = body.access_token
+        row.config = body.config or row.config or {}
+    else:
+        row = IntegrationState(
+            founder_id=founder_id, service=service,
+            access_token=body.access_token, config=body.config or {},
+        )
+        db.add(row)
+    db.commit()
+    return {"service": service, "status": "connected"}
+
+
+def _chief_of_staff_reply(founder_id: str, message: str, db: Session) -> str:
+    """The chief-of-staff brain. Lazy v1: stuff recent alerts + decisions as
+    context and answer (read-only, recommend-don't-execute). Shared by the web
+    /chat endpoint and the Slack bot so there's one brain.
+    ponytail: no tool-calling/draft-send yet — add when the agent must act."""
+    alerts = db.query(Alert).filter(
+        Alert.founder_id == founder_id, Alert.status == "active"
+    ).order_by(Alert.triggered_at.desc()).limit(10).all()
+    decisions = db.query(Decision).filter(
+        Decision.founder_id == founder_id
+    ).order_by(Decision.made_at.desc()).limit(10).all()
+
+    context = "ACTIVE ALERTS:\n" + ("\n".join(
+        f"- [{a.alert_type}] {a.title}: {a.what_happened}" for a in alerts
+    ) or "(none)")
+    context += "\n\nRECENT DECISIONS:\n" + ("\n".join(
+        f"- {d.decision_type}: {d.decision_text}" for d in decisions
+    ) or "(none)")
+
+    prompt = (
+        "You are the founder's AI Chief of Staff. Answer concisely and like a "
+        "thought partner. Recommend; never claim to have sent or executed "
+        "anything — drafts require the founder's approval.\n\n"
+        f"{context}\n\nFounder: {message}\nChief of Staff:"
+    )
+    coordinator_agent.memory_db = db
+    return coordinator_agent._call_with_fallback(prompt)
+
+
+@app.post("/founders/{founder_id}/chat")
+def chat(founder_id: str, body: ChatRequest, db: Session = Depends(get_db)):
+    """Conversational chief of staff (web)."""
+    founder = db.query(Founder).filter(Founder.id == founder_id).first()
+    if not founder:
+        raise HTTPException(status_code=404, detail="Founder not found")
+    try:
+        return {"reply": _chief_of_staff_reply(founder_id, body.message, db)}
+    except Exception as e:
+        logger.error(f"chat failed: {e}")
+        raise HTTPException(status_code=503, detail="assistant unavailable")
+
+
+def _verify_slack(raw: bytes, ts: str, sig: str) -> bool:
+    """Verify Slack's request signature (trust boundary — don't skip in prod)."""
+    secret = os.getenv("SLACK_SIGNING_SECRET")
+    if not secret:
+        logger.warning("SLACK_SIGNING_SECRET unset — skipping signature check (set it in prod)")
+        return True  # ponytail: dev fallback only; required once the bot is public
+    try:
+        if abs(time.time() - int(ts)) > 300:
+            return False
+    except (TypeError, ValueError):
+        return False
+    base = b"v0:" + ts.encode() + b":" + raw
+    mine = "v0=" + hmac.new(secret.encode(), base, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(mine, sig or "")
+
+
+def _slack_reply_worker(founder_id: str, channel: str, message: str):
+    """Run the chief-of-staff brain and post the reply back to Slack (background
+    so we ack Slack within its 3s window and avoid retries)."""
+    db = SessionLocal()
+    try:
+        reply = _chief_of_staff_reply(founder_id, message, db)
+        SlackAdapter(os.getenv("SLACK_BOT_TOKEN")).post_message(channel, reply)
+    except Exception as e:
+        logger.error(f"Slack reply worker failed: {e}")
+    finally:
+        db.close()
+
+
+@app.post("/slack/events")
+async def slack_events(request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
+    """Slack Events API: a founder DMs the bot → reply with the chief of staff.
+    Reachable with no browser open — the CoS lives in Slack."""
+    raw = await request.body()
+    payload = json.loads(raw or b"{}")
+
+    # Slack endpoint setup handshake
+    if payload.get("type") == "url_verification":
+        return {"challenge": payload.get("challenge")}
+
+    if not _verify_slack(
+        raw,
+        request.headers.get("X-Slack-Request-Timestamp", ""),
+        request.headers.get("X-Slack-Signature", ""),
+    ):
+        raise HTTPException(status_code=403, detail="bad signature")
+
+    event = payload.get("event", {})
+    # Real human message only — ignore the bot's own posts and edits/joins.
+    if event.get("type") == "message" and not event.get("bot_id") and not event.get("subtype"):
+        user = event.get("user")
+        text = (event.get("text") or "").strip()
+        channel = event.get("channel")
+        founder = db.query(Founder).filter(Founder.slack_user_id == user).first()
+        if founder and text and channel:
+            background.add_task(_slack_reply_worker, founder.id, channel, text)
+
+    return {"ok": True}  # ack fast; reply happens in the background
 
 
 @app.post("/slack/actions")
