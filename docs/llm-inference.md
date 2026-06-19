@@ -56,9 +56,9 @@ Rationale:
 LLM_MODE=cloud
 ANTHROPIC_API_KEY=...            # founder's own
 OPENAI_API_KEY=...               # founder's own (fallback)
-LLM_PRIMARY_MODEL=claude-3-5-sonnet-20241022   # optional overrides
+LLM_PRIMARY_MODEL=claude-sonnet-4-6            # optional overrides
 LLM_FALLBACK_MODEL=gpt-4-turbo
-LLM_LAST_RESORT_MODEL=claude-3-haiku-20240307
+LLM_LAST_RESORT_MODEL=claude-haiku-4-5
 LLM_EMBED_MODEL=text-embedding-3-small
 
 # Mode B — fully local, data never leaves the host

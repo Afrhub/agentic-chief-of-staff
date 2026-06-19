@@ -63,10 +63,10 @@ class CoordinatorAgent:
 
         # Cloud (BYO keys). Anthropic primary + last-resort; OpenAI fallback only
         # if a key is set (so an Anthropic-only deploy boots without OPENAI_API_KEY).
-        chain = [("primary", ChatAnthropic(model=os.getenv("LLM_PRIMARY_MODEL", "claude-3-5-sonnet-20241022")))]
+        chain = [("primary", ChatAnthropic(model=os.getenv("LLM_PRIMARY_MODEL", "claude-sonnet-4-6")))]
         if os.getenv("OPENAI_API_KEY"):
             chain.append(("fallback", ChatOpenAI(model=os.getenv("LLM_FALLBACK_MODEL", "gpt-4-turbo"))))
-        chain.append(("last_resort", ChatAnthropic(model=os.getenv("LLM_LAST_RESORT_MODEL", "claude-3-haiku-20240307"))))
+        chain.append(("last_resort", ChatAnthropic(model=os.getenv("LLM_LAST_RESORT_MODEL", "claude-haiku-4-5"))))
         logger.info(f"LLM mode=cloud ({len(chain)} models; openai fallback={'on' if os.getenv('OPENAI_API_KEY') else 'off'})")
         return chain
 
