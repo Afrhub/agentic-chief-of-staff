@@ -83,6 +83,12 @@ class DraftRequest(BaseModel):
     recipient: Optional[str] = None
 
 
+class FounderRequest(BaseModel):
+    email: Optional[str] = None
+    slack_user_id: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Scheduler lifecycle
 # ---------------------------------------------------------------------------
@@ -349,6 +355,24 @@ def evaluate_all_founders():
 @app.get("/health")
 def health():
     return {"status": "ok", "scheduler_running": scheduler.running}
+
+
+@app.post("/founders/{founder_id}")
+def upsert_founder(founder_id: str, body: FounderRequest, db: Session = Depends(get_db)):
+    """Create/update a founder (onboarding + seeding).
+    ponytail: open for now — gate behind auth in #2 before real users."""
+    f = db.query(Founder).filter(Founder.id == founder_id).first()
+    if not f:
+        f = Founder(id=founder_id, email=body.email or f"{founder_id}@demo.test")
+        db.add(f)
+    elif body.email:
+        f.email = body.email
+    if body.slack_user_id is not None:
+        f.slack_user_id = body.slack_user_id
+    if body.whatsapp_number is not None:
+        f.whatsapp_number = body.whatsapp_number
+    db.commit()
+    return {"id": founder_id, "status": "ok"}
 
 
 @app.post("/founders/{founder_id}/alerts")
