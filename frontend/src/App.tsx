@@ -11,7 +11,11 @@ const App: React.FC = () => {
   useEffect(() => {
     // Real auth (OAuth/session) sets `founder_id`. With none present we fall
     // back to a self-contained demo founder so the app is never a dead end.
-    const stored = localStorage.getItem('founder_id');
+    // ponytail: `?founder=<id>` overrides + persists, so a live account can be
+    // tested in the deployed UI before the OAuth flow exists. Drop when auth lands.
+    const fromUrl = new URLSearchParams(window.location.search).get('founder');
+    if (fromUrl) localStorage.setItem('founder_id', fromUrl);
+    const stored = fromUrl || localStorage.getItem('founder_id');
     setFounderId(stored || DEMO_FOUNDER_ID);
     setLoading(false);
   }, []);
