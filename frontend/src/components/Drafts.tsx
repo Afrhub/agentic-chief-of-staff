@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { API_BASE } from '../config';
+import { apiFetch } from '../config';
 import { isDemoFounder } from '../demo';
 import '../styles/chat.css';
 
@@ -37,7 +37,7 @@ const Drafts: React.FC<{ founderId: string }> = ({ founderId }) => {
       return;
     }
     try {
-      const r = await fetch(`${API_BASE}/founders/${founderId}/drafts?status=pending`);
+      const r = await apiFetch(`/founders/${founderId}/drafts?status=pending`);
       if (!r.ok) throw new Error();
       setList(await r.json());
     } catch {
@@ -59,9 +59,8 @@ const Drafts: React.FC<{ founderId: string }> = ({ founderId }) => {
     }
     setBusy(true);
     try {
-      const r = await fetch(`${API_BASE}/founders/${founderId}/drafts`, {
+      const r = await apiFetch(`/founders/${founderId}/drafts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ instruction: text, channel })
       });
       if (!r.ok) throw new Error();
@@ -79,7 +78,7 @@ const Drafts: React.FC<{ founderId: string }> = ({ founderId }) => {
     setList((l) => l.filter((d) => d.id !== id)); // optimistic
     if (demo) return;
     try {
-      await fetch(`${API_BASE}/founders/${founderId}/drafts/${id}/${action}`, { method: 'POST' });
+      await apiFetch(`/founders/${founderId}/drafts/${id}/${action}`, { method: 'POST' });
     } catch {
       /* ignore */
     }

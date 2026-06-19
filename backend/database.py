@@ -21,11 +21,21 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     """Initialize database tables and pgvector extension."""
-    with engine.begin() as conn:
-        conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS vector")
-        conn.commit()
+    is_pg = engine.dialect.name == "postgresql"
+    if is_pg:
+        with engine.begin() as conn:
+            conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS vector")
 
     Base.metadata.create_all(bind=engine)
+
+    # create_all() never ALTERs an existing table, so columns added after the
+    # founders table already shipped need a one-shot migration. ponytail:
+    # ADD COLUMN IF NOT EXISTS instead of standing up Alembic for two columns;
+    # switch to Alembic if migrations start piling up.
+    if is_pg:
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE founders ADD COLUMN IF NOT EXISTS password_hash VARCHAR")
+            conn.exec_driver_sql("ALTER TABLE founders ADD COLUMN IF NOT EXISTS session_token VARCHAR")
     print("✓ Database initialized")
 
 

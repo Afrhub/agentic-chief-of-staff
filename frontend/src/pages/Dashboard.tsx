@@ -6,7 +6,7 @@ import ChatPanel from '../components/ChatPanel';
 import Integrations from '../components/Integrations';
 import Drafts from '../components/Drafts';
 import Tilt from '../components/Tilt';
-import { API_BASE } from '../config';
+import { apiFetch } from '../config';
 import { DEMO_ALERTS, isDemoFounder } from '../demo';
 import '../styles/Dashboard.css';
 import '../styles/fx.css';
@@ -28,9 +28,10 @@ interface Alert {
 
 interface DashboardProps {
   founderId: string;
+  onLogout?: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
+const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
@@ -61,9 +62,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
       return;
     }
     try {
-      const response = await fetch(
-        `${API_BASE}/founders/${founderId}/alerts?status=active`
-      );
+      const response = await apiFetch(`/founders/${founderId}/alerts?status=active`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setAlerts(await response.json());
     } catch (error) {
@@ -89,9 +88,8 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
     setAlerts((prev) => prev.filter((a) => a.id !== alertId)); // optimistic
     if (demo) return; // demo is local-only; nothing to POST
     try {
-      await fetch(`${API_BASE}/founders/${founderId}/alerts/${alertId}/${path}`, {
+      await apiFetch(`/founders/${founderId}/alerts/${alertId}/${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
       await fetchAlerts();
@@ -149,6 +147,11 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId }) => {
         </div>
         <div className="island__right">
           {demo && <span className="demo-pill">Demo data</span>}
+          {onLogout && (
+            <button className="logout-btn" onClick={onLogout} title="Log out">
+              Log out
+            </button>
+          )}
           <span className="status-pill" title="Monitoring active">
             <span className="status-pill__dot" />
             Monitoring · {sourceCount} sources

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { API_BASE } from '../config';
+import { apiFetch } from '../config';
 import { isDemoFounder } from '../demo';
 import '../styles/chat.css';
 
@@ -29,9 +29,8 @@ const ChatPanel: React.FC<{ founderId: string }> = ({ founderId }) => {
     }
     setBusy(true);
     try {
-      const r = await fetch(`${API_BASE}/founders/${founderId}/chat`, {
+      const r = await apiFetch(`/founders/${founderId}/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text })
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);

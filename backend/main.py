@@ -1,5 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -18,6 +20,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from database import init_db, get_db, SessionLocal
 from schema import Founder, Alert, Decision, IntegrationState, Draft
+from auth import hash_password, verify_password, new_token
 from coordinator import CoordinatorAgent, CoordinatorState, AlertSignal
 from integrations.slack_adapter import SlackAdapter
 from integrations.stripe_adapter import StripeAdapter
@@ -30,6 +33,30 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="dCernment")
 
+
+async def _require_session(request: Request, call_next):
+    """Gate every /founders/{id}/* route: the bearer token must match that
+    founder's session_token. One chokepoint so a new route can't forget to auth.
+    Demo mode is frontend-only (canned data, never calls these), so it's unaffected."""
+    path = request.url.path
+    if request.method != "OPTIONS" and path.startswith("/founders/"):
+        parts = path.split("/")
+        founder_id = parts[2] if len(parts) > 2 else ""
+        token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+        db = SessionLocal()
+        try:
+            f = db.query(Founder).filter(Founder.id == founder_id).first()
+            ok = bool(f and f.session_token and token and hmac.compare_digest(f.session_token, token))
+        finally:
+            db.close()
+        if not ok:
+            return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+    return await call_next(request)
+
+
+# Order matters: session gate added first (inner), CORS added last (outer), so
+# even a 401 from the gate carries CORS headers and the browser can read it.
+app.add_middleware(BaseHTTPMiddleware, dispatch=_require_session)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -87,6 +114,11 @@ class FounderRequest(BaseModel):
     email: Optional[str] = None
     slack_user_id: Optional[str] = None
     whatsapp_number: Optional[str] = None
+
+
+class AuthRequest(BaseModel):
+    email: str
+    password: str
 
 
 # ---------------------------------------------------------------------------
@@ -352,6 +384,35 @@ def evaluate_all_founders():
 # ---------------------------------------------------------------------------
 
 
+@app.post("/auth/signup")
+def signup(body: AuthRequest, db: Session = Depends(get_db)):
+    """Create an account → returns {founder_id, token}. Public by design."""
+    email = (body.email or "").strip().lower()
+    if "@" not in email or len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="Valid email and password (min 8 chars) required")
+    if db.query(Founder).filter(Founder.email == email).first():
+        raise HTTPException(status_code=409, detail="An account with that email already exists")
+    token = new_token()
+    f = Founder(email=email, password_hash=hash_password(body.password), session_token=token)
+    db.add(f)
+    db.commit()
+    db.refresh(f)
+    return {"founder_id": f.id, "token": token}
+
+
+@app.post("/auth/login")
+def login(body: AuthRequest, db: Session = Depends(get_db)):
+    """Verify credentials → rotate + return a fresh session token."""
+    email = (body.email or "").strip().lower()
+    f = db.query(Founder).filter(Founder.email == email).first()
+    if not f or not f.password_hash or not verify_password(body.password, f.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = new_token()
+    f.session_token = token  # rotate on each login (invalidates the prior token)
+    db.commit()
+    return {"founder_id": f.id, "token": token}
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "scheduler_running": scheduler.running}
@@ -359,8 +420,8 @@ def health():
 
 @app.post("/founders/{founder_id}")
 def upsert_founder(founder_id: str, body: FounderRequest, db: Session = Depends(get_db)):
-    """Create/update a founder (onboarding + seeding).
-    ponytail: open for now — gate behind auth in #2 before real users."""
+    """Update your own founder profile (email / slack / whatsapp). Auth-gated by
+    the session middleware; account creation now happens via /auth/signup."""
     f = db.query(Founder).filter(Founder.id == founder_id).first()
     if not f:
         f = Founder(id=founder_id, email=body.email or f"{founder_id}@demo.test")

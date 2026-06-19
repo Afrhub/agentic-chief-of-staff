@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { API_BASE } from '../config';
+import { apiFetch } from '../config';
 import { isDemoFounder } from '../demo';
 import '../styles/chat.css';
 
@@ -28,7 +28,7 @@ const Integrations: React.FC<{ founderId: string }> = ({ founderId }) => {
       return;
     }
     try {
-      const r = await fetch(`${API_BASE}/founders/${founderId}/integrations`);
+      const r = await apiFetch(`/founders/${founderId}/integrations`);
       if (!r.ok) throw new Error();
       setList(await r.json());
     } catch {
@@ -47,9 +47,8 @@ const Integrations: React.FC<{ founderId: string }> = ({ founderId }) => {
       return;
     }
     try {
-      const r = await fetch(`${API_BASE}/founders/${founderId}/integrations/granola`, {
+      const r = await apiFetch(`/founders/${founderId}/integrations/granola`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ access_token: key.trim() })
       });
       if (!r.ok) throw new Error();

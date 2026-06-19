@@ -56,51 +56,57 @@ with mock.patch("database.init_db", sqlite_init):
 main.coordinator_agent._call_with_fallback = stub_llm  # stub LLM text only
 
 from fastapi.testclient import TestClient
-from schema import Founder
-
-# Seed a founder directly in the live DB.
-db = main.SessionLocal()
-if not db.query(Founder).filter(Founder.id == "demo").first():
-    db.add(Founder(id="demo", email="demo@founder.test"))
-    db.commit()
-db.close()
-print("\n==> 1. Seeded founder 'demo' (real DB write)")
 
 with TestClient(main.app) as c:
-    print("==> 2. Health")
+    print("\n==> 1. Health")
     r = c.get("/health"); check("health 200 + scheduler running", r.status_code == 200 and r.json().get("scheduler_running"))
 
-    print("==> 3. Single signal -> suppressed (>=2 distinct rule, real coordinator)")
-    r = c.post("/founders/demo/alerts", json={"signals": [{"type": "revenue_anomaly", "confidence": 0.9, "data": {"mrr": 16000}}]})
+    print("==> 2. Signup -> session token (creates the founder; no manual seed)")
+    r = c.post("/auth/signup", json={"email": "founder@test.co", "password": "hunter2hunter"})
+    check("signup 200 + token", r.status_code == 200 and bool(r.json().get("token")))
+    check("signup rejects short password", c.post("/auth/signup", json={"email": "x@y.co", "password": "short"}).status_code == 400)
+    fid = r.json()["founder_id"]
+
+    print("==> 3. Founder route WITHOUT token -> 401 (the auth gate)")
+    check("unauthenticated alerts -> 401", c.get(f"/founders/{fid}/alerts").status_code == 401)
+
+    print("==> 4. Login: wrong password -> 401, right password -> rotated token")
+    check("wrong password -> 401", c.post("/auth/login", json={"email": "founder@test.co", "password": "WRONGWRONG"}).status_code == 401)
+    r = c.post("/auth/login", json={"email": "founder@test.co", "password": "hunter2hunter"})
+    check("login 200 + token", r.status_code == 200 and bool(r.json().get("token")))
+    c.headers.update({"Authorization": f"Bearer {r.json()['token']}"})  # authed for the rest
+
+    print("==> 5. Single signal -> suppressed (>=2 distinct rule, real coordinator)")
+    r = c.post(f"/founders/{fid}/alerts", json={"signals": [{"type": "revenue_anomaly", "confidence": 0.9, "data": {"mrr": 16000}}]})
     check("single signal suppressed", r.json().get("status") == "suppressed")
 
-    print("==> 4. Two distinct signals -> surfaced (real graph + persistence)")
-    r = c.post("/founders/demo/alerts", json={"signals": [
+    print("==> 6. Two distinct signals -> surfaced (real graph + persistence)")
+    r = c.post(f"/founders/{fid}/alerts", json={"signals": [
         {"type": "revenue_anomaly", "confidence": 0.9, "data": {"mrr": 16000}},
         {"type": "churn_signal", "confidence": 0.85, "data": {"count": 3}},
     ]})
     check("alert surfaced", r.json().get("status") == "surfaced")
     check("alert has synthesized next_decision", "Pause ads" in (r.json().get("next_decision") or ""))
 
-    print("==> 5. GET alerts (real DB read)")
-    r = c.get("/founders/demo/alerts"); check("1 active alert returned", len(r.json()) == 1)
+    print("==> 7. GET alerts (authed, real DB read)")
+    r = c.get(f"/founders/{fid}/alerts"); check("1 active alert returned", len(r.json()) == 1)
 
-    print("==> 6. Chat with draft intent -> creates a pending draft (real intent + persist)")
-    r = c.post("/founders/demo/chat", json={"message": "draft a reply to the investor about the dip"})
+    print("==> 8. Chat with draft intent -> creates a pending draft (real intent + persist)")
+    r = c.post(f"/founders/{fid}/chat", json={"message": "draft a reply to the investor about the dip"})
     check("chat spawned a draft", "draft_id" in r.json())
 
-    print("==> 7. GET drafts (real DB read)")
-    r = c.get("/founders/demo/drafts"); drafts = r.json()
+    print("==> 9. GET drafts (real DB read)")
+    r = c.get(f"/founders/{fid}/drafts"); drafts = r.json()
     check("1 pending draft", len(drafts) == 1)
     check("draft has a subject/body", bool(drafts and drafts[0].get("body")))
 
-    print("==> 8. Approve the draft (no creds -> 'approved', send is no-op)")
+    print("==> 10. Approve the draft (no creds -> 'approved', send is no-op)")
     did = drafts[0]["id"]
-    r = c.post(f"/founders/demo/drafts/{did}/approve"); check("approve recorded", r.json().get("status") in ("approved", "sent"))
-    r = c.get("/founders/demo/drafts"); check("no pending drafts left", len(r.json()) == 0)
+    r = c.post(f"/founders/{fid}/drafts/{did}/approve"); check("approve recorded", r.json().get("status") in ("approved", "sent"))
+    r = c.get(f"/founders/{fid}/drafts"); check("no pending drafts left", len(r.json()) == 0)
 
-    print("==> 9. Plain chat question (real reply path)")
-    r = c.post("/founders/demo/chat", json={"message": "what's our churn story?"})
+    print("==> 11. Plain chat question (real reply path)")
+    r = c.post(f"/founders/{fid}/chat", json={"message": "what's our churn story?"})
     check("chat answered", bool(r.json().get("reply")))
 
 print(f"\n{'ALL ' + str(len(passed)) + ' CHECKS PASSED' if not failed else str(len(failed)) + ' FAILED: ' + str(failed)}")

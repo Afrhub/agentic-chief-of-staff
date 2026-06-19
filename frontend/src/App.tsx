@@ -1,37 +1,49 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
+import Login from './pages/Login';
 import { DEMO_FOUNDER_ID } from './demo';
 import './App.css';
 
 const App: React.FC = () => {
   const [founderId, setFounderId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [demo, setDemo] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Real auth (OAuth/session) sets `founder_id`. With none present we fall
-    // back to a self-contained demo founder so the app is never a dead end.
-    // ponytail: `?founder=<id>` overrides + persists, so a live account can be
-    // tested in the deployed UI before the OAuth flow exists. Drop when auth lands.
-    const fromUrl = new URLSearchParams(window.location.search).get('founder');
-    if (fromUrl) localStorage.setItem('founder_id', fromUrl);
-    const stored = fromUrl || localStorage.getItem('founder_id');
-    setFounderId(stored || DEMO_FOUNDER_ID);
-    setLoading(false);
+    // Theme tokens cascade off data-theme — set it before any screen renders.
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('cos-theme') || 'dark');
+
+    // `?demo` or `?founder=demo-founder` → public canned demo, no login.
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('demo') || params.get('founder') === DEMO_FOUNDER_ID) {
+      setDemo(true);
+      setFounderId(DEMO_FOUNDER_ID);
+    } else {
+      // Live: require a session from login (token + id stored by Login).
+      const token = localStorage.getItem('token');
+      const fid = localStorage.getItem('founder_id');
+      if (token && fid) setFounderId(fid);
+    }
+    setReady(true);
   }, []);
 
-  if (loading) {
-    return <div className="loading">Loading…</div>;
-  }
+  const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('founder_id');
+    setFounderId(null);
+  };
 
-  if (!founderId) {
-    return <div className="auth-required">Redirecting to auth…</div>;
-  }
+  if (!ready) return <div className="loading">Loading…</div>;
+  if (!founderId) return <Login onAuthed={setFounderId} />;
 
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Dashboard founderId={founderId} />} />
+        <Route
+          path="/"
+          element={<Dashboard founderId={founderId} onLogout={demo ? undefined : logout} />}
+        />
       </Routes>
     </Router>
   );
