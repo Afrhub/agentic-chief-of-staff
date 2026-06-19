@@ -1,0 +1,31 @@
+# Render blueprint — backend API + Postgres (pgvector). One-time setup:
+#   Render dashboard → New → Blueprint → pick this repo → set ANTHROPIC_API_KEY → Apply.
+# The app's init_db() runs `CREATE EXTENSION IF NOT EXISTS vector` on first boot.
+services:
+  - type: web
+    name: dcernment-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dcernment-db
+          property: connectionString
+      - key: ANTHROPIC_API_KEY
+        sync: false          # set in the Render dashboard (secret)
+      - key: OPENAI_API_KEY
+        sync: false          # optional fallback + embeddings
+      - key: LLM_MODE
+        value: cloud
+      # Optional integration secrets — set in dashboard when ready:
+      # SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, STRIPE_API_KEY,
+      # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+      # TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM
+
+databases:
+  - name: dcernment-db
+    plan: free
+    postgresMajorVersion: "16"

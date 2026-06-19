@@ -915,4 +915,5 @@ def _post_to_slack(founder: Founder, alert: Alert) -> bool:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Respect the platform's $PORT (Render/Cloud Run/Heroku); default 8000 locally.
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))

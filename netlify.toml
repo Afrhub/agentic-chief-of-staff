@@ -6,5 +6,9 @@
 
 [build.environment]
   CI = "false"   # don't treat lint warnings as hard errors in CI build
+  # Frontend calls the backend at this URL. Default matches the render.yaml
+  # service name; if Render assigns a different host, override REACT_APP_API_URL
+  # in Netlify → Site configuration → Environment variables, then redeploy.
+  REACT_APP_API_URL = "https://dcernment-api.onrender.com"
 
 # SPA routing + cache headers also live in frontend/public/_redirects & _headers
