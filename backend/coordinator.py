@@ -61,12 +61,14 @@ class CoordinatorAgent:
             logger.info(f"LLM mode=local model={model} base_url={base_url}")
             return [("local", local)]
 
-        # Cloud (BYO keys). Model ids overridable via env.
-        primary = ChatAnthropic(model=os.getenv("LLM_PRIMARY_MODEL", "claude-3-5-sonnet-20241022"))
-        secondary = ChatOpenAI(model=os.getenv("LLM_FALLBACK_MODEL", "gpt-4-turbo"))
-        tertiary = ChatAnthropic(model=os.getenv("LLM_LAST_RESORT_MODEL", "claude-3-haiku-20240307"))
-        logger.info("LLM mode=cloud (anthropic primary -> openai -> anthropic-haiku)")
-        return [("primary", primary), ("fallback", secondary), ("last_resort", tertiary)]
+        # Cloud (BYO keys). Anthropic primary + last-resort; OpenAI fallback only
+        # if a key is set (so an Anthropic-only deploy boots without OPENAI_API_KEY).
+        chain = [("primary", ChatAnthropic(model=os.getenv("LLM_PRIMARY_MODEL", "claude-3-5-sonnet-20241022")))]
+        if os.getenv("OPENAI_API_KEY"):
+            chain.append(("fallback", ChatOpenAI(model=os.getenv("LLM_FALLBACK_MODEL", "gpt-4-turbo"))))
+        chain.append(("last_resort", ChatAnthropic(model=os.getenv("LLM_LAST_RESORT_MODEL", "claude-3-haiku-20240307"))))
+        logger.info(f"LLM mode=cloud ({len(chain)} models; openai fallback={'on' if os.getenv('OPENAI_API_KEY') else 'off'})")
+        return chain
 
     def _build_embeddings(self):
         """Embeddings provider — cloud OpenAI by default, or a local
@@ -77,6 +79,10 @@ class CoordinatorAgent:
                 base_url=os.getenv("LLM_LOCAL_BASE_URL", "http://localhost:11434/v1"),
                 api_key=os.getenv("LLM_LOCAL_API_KEY", "local"),
             )
+        # No OpenAI key → no embeddings client; _embed_decision_context falls back
+        # to a deterministic hash vector (lower-quality precedent recall, but boots).
+        if not os.getenv("OPENAI_API_KEY"):
+            return None
         return OpenAIEmbeddings(model=os.getenv("LLM_EMBED_MODEL", "text-embedding-3-small"))
 
     def analyze_signals(self, state: CoordinatorState) -> CoordinatorState:
@@ -236,9 +242,11 @@ NEXT_DECISION: [decision]
     def _embed_decision_context(self, text: str) -> list:
         """Generate embedding for semantic memory search using OpenAI."""
         try:
+            if self.embeddings is None:
+                raise RuntimeError("no embeddings provider configured")
             return self.embeddings.embed_query(text)
         except Exception as e:
-            logger.error(f"Embedding generation failed: {e}")
+            logger.warning(f"Embedding unavailable, using hash fallback: {e}")
             # Deterministic fallback so semantic search still returns *something*
             # rather than crashing the alert pipeline.
             digest = hashlib.sha256(text.encode()).digest()
