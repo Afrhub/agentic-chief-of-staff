@@ -21,6 +21,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from database import init_db, get_db, SessionLocal
 from schema import Founder, Alert, Decision, IntegrationState, Draft
 from auth import hash_password, verify_password, new_token
+from packs import get_pack, list_packs
 from coordinator import CoordinatorAgent, CoordinatorState, AlertSignal
 from integrations.slack_adapter import SlackAdapter
 from integrations.stripe_adapter import StripeAdapter
@@ -114,11 +115,13 @@ class FounderRequest(BaseModel):
     email: Optional[str] = None
     slack_user_id: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    pack: Optional[str] = None
 
 
 class AuthRequest(BaseModel):
     email: str
     password: str
+    pack: Optional[str] = None  # vertical pack id chosen at signup (industry)
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +181,10 @@ def process_signals(founder_id: str, signals: List[AlertSignal], db: Session) ->
         return None
 
     coordinator_agent.memory_db = db
+    # Industry framing: load the founder's vertical pack so the coordinator
+    # synthesizes the alert in that industry's terms (SaaS vs e-commerce vs …).
+    founder = db.query(Founder).filter(Founder.id == founder_id).first()
+    coordinator_agent.active_pack = get_pack(getattr(founder, "pack", None) if founder else None)
     graph = coordinator_agent.build_graph()
 
     state: CoordinatorState = {
@@ -216,8 +223,7 @@ def process_signals(founder_id: str, signals: List[AlertSignal], db: Session) ->
     db.commit()
     db.refresh(alert)
 
-    founder = db.query(Founder).filter(Founder.id == founder_id).first()
-    if founder:
+    if founder:  # fetched above for the pack lookup
         _post_to_slack(founder, alert)
 
     return alert
@@ -353,6 +359,26 @@ def evaluate_all_founders():
             ).all()
 
             for state in states:
+                cfg = state.config or {}
+                # MCP-sourced signal: any connected integration whose config is
+                # kind="mcp" is pulled via the MCP adapter (config not adapter code).
+                if cfg.get("kind") == "mcp":
+                    try:
+                        from integrations.mcp_adapter import collect as mcp_collect
+                        collected.extend(mcp_collect(
+                            cfg["mcp_server"], state.access_token, cfg["tool"],
+                            cfg.get("maps_to", "external_signal"),
+                            cfg.get("confidence", 0.8), cfg.get("args"),
+                        ))
+                        state.last_sync_status = "success"
+                        state.last_error = None
+                    except Exception as e:
+                        state.last_sync_status = "failed"
+                        state.last_error = str(e)
+                        logger.error(f"mcp collection failed for {founder.id}: {e}")
+                    state.last_sync_at = datetime.utcnow()
+                    continue
+
                 collector = _COLLECTORS.get(state.service)
                 if not collector:
                     continue
@@ -393,11 +419,15 @@ def signup(body: AuthRequest, db: Session = Depends(get_db)):
     if db.query(Founder).filter(Founder.email == email).first():
         raise HTTPException(status_code=409, detail="An account with that email already exists")
     token = new_token()
-    f = Founder(email=email, password_hash=hash_password(body.password), session_token=token)
+    pack_id = get_pack(body.pack).get("id")  # validated → real pack id or default
+    f = Founder(
+        email=email, password_hash=hash_password(body.password),
+        session_token=token, pack=pack_id,
+    )
     db.add(f)
     db.commit()
     db.refresh(f)
-    return {"founder_id": f.id, "token": token}
+    return {"founder_id": f.id, "token": token, "pack": pack_id}
 
 
 @app.post("/auth/login")
@@ -411,6 +441,12 @@ def login(body: AuthRequest, db: Session = Depends(get_db)):
     f.session_token = token  # rotate on each login (invalidates the prior token)
     db.commit()
     return {"founder_id": f.id, "token": token}
+
+
+@app.get("/packs")
+def get_packs():
+    """Available vertical packs (industry framings) — drives the onboarding picker."""
+    return list_packs()
 
 
 @app.get("/health")
@@ -432,6 +468,8 @@ def upsert_founder(founder_id: str, body: FounderRequest, db: Session = Depends(
         f.slack_user_id = body.slack_user_id
     if body.whatsapp_number is not None:
         f.whatsapp_number = body.whatsapp_number
+    if body.pack is not None:
+        f.pack = get_pack(body.pack).get("id")  # validated
     db.commit()
     return {"id": founder_id, "status": "ok"}
 

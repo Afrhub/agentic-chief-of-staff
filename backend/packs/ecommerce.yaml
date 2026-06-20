@@ -1,0 +1,38 @@
+# Vertical pack: e-commerce / DTC. Same engine, different vocabulary, persona,
+# and sources — including an MCP-sourced signal (support) to show that adding a
+# tool is configuration, not adapter code.
+id: ecommerce
+name: E-commerce / DTC
+persona: >
+  You are the chief of staff to the founder of a direct-to-consumer e-commerce
+  brand. Frame decisions around revenue and orders, CAC/ROAS, inventory and
+  fulfilment, and refund/return rates. Be direct and numbers-first.
+signals:
+  - type: revenue_anomaly
+    label: Revenue / orders
+    description: Sales drop, conversion dip, or refund-rate spike
+  - type: cac_spike
+    label: CAC / ROAS
+    description: Ad spend rising faster than revenue
+  - type: inventory_risk
+    label: Inventory
+    description: Stockout risk or overstock on key SKUs
+  - type: support_spike
+    label: Support spike
+    description: Surge in support volume or negative sentiment
+sources:
+  - axis: money
+    kind: adapter
+    service: stripe
+  - axis: comms
+    kind: adapter
+    service: slack
+  # An MCP-sourced signal: connect the Intercom MCP server (token stored via the
+  # normal integrations endpoint with config.kind="mcp") and its tool output maps
+  # straight to a support_spike signal — no new adapter code.
+  - axis: support
+    kind: mcp
+    service: intercom
+    tool: list_recent_conversations
+    maps_to: support_spike
+    confidence: 0.8

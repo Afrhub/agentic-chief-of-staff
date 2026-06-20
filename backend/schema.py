@@ -15,6 +15,7 @@ class Founder(Base):
     email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=True)        # PBKDF2; null for demo/legacy rows
     session_token = Column(String, nullable=True, index=True)  # opaque bearer; rotates on login
+    pack = Column(String, nullable=True, default="saas")  # vertical pack id (industry framing)
     slack_user_id = Column(String, nullable=True)
     whatsapp_number = Column(String, nullable=True)  # e.g. "+14155551234" (maps inbound WhatsApp)
     stripe_account_id = Column(String, nullable=True)

@@ -1,0 +1,35 @@
+# Vertical pack: B2B SaaS. A pack retargets the SAME engine to an industry by
+# declaring its signal vocabulary, the chief-of-staff persona used to synthesize
+# alerts, and which sources feed it. No code changes per industry.
+id: saas
+name: SaaS / Software
+persona: >
+  You are the chief of staff to the founder of a B2B SaaS company. Frame every
+  decision around MRR, net retention, runway, pipeline, and fundraising. Be
+  direct and numbers-first; a founder reads this between meetings.
+signals:
+  - type: revenue_anomaly
+    label: Revenue anomaly
+    description: MRR drop, failed payments, or unusual billing movement
+  - type: churn_signal
+    label: Churn
+    description: Cancellations or accounts showing pre-churn behaviour
+  - type: investor_contact
+    label: Investor contact
+    description: Inbound from a known investor or VIP
+  - type: team_conflict
+    label: Team escalation
+    description: Internal friction or blockers surfacing in team channels
+sources:
+  - axis: money
+    kind: adapter
+    service: stripe
+  - axis: customers
+    kind: adapter
+    service: email
+  - axis: comms
+    kind: adapter
+    service: slack
+  - axis: meetings
+    kind: adapter
+    service: granola

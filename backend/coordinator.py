@@ -37,6 +37,10 @@ class CoordinatorAgent:
 
     def __init__(self, memory_db=None):
         self.memory_db = memory_db
+        # Active vertical pack (industry framing); set per-call in process_signals.
+        # ponytail: per-call attribute mirrors how memory_db is injected — fine for
+        # the in-process scheduler/request model; revisit if the agent goes async-concurrent.
+        self.active_pack = None
         # The model chain is built from env so a self-hosted founder can run on
         # their own cloud keys (default) OR a fully-local OpenAI-compatible
         # endpoint (vLLM / Ollama / LM Studio) where data never leaves the box.
@@ -164,7 +168,11 @@ class CoordinatorAgent:
             for s in signals
         ])
 
-        return f"""You are analyzing multiple signals to determine if a founder needs an urgent decision alert.
+        persona = (self.active_pack or {}).get("persona") or "You are the founder's AI Chief of Staff."
+
+        return f"""{persona}
+
+You are analyzing multiple signals to determine if a founder needs an urgent decision alert.
 
 Signals received:
 {signal_summary}

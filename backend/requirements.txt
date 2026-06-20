@@ -10,6 +10,9 @@ pgvector==0.2.5
 sqlalchemy==2.0.23
 pydantic==2.5.0
 python-dotenv==1.0.0
+pyyaml==6.0.1
+# MCP sources are optional — install `mcp` to activate kind="mcp" integrations.
+# Left out by default so the core deploy never breaks on it.
 slack-sdk==3.26.1
 stripe==7.4.0
 google-auth==2.25.2

@@ -36,6 +36,7 @@ def init_db():
         with engine.begin() as conn:
             conn.exec_driver_sql("ALTER TABLE founders ADD COLUMN IF NOT EXISTS password_hash VARCHAR")
             conn.exec_driver_sql("ALTER TABLE founders ADD COLUMN IF NOT EXISTS session_token VARCHAR")
+            conn.exec_driver_sql("ALTER TABLE founders ADD COLUMN IF NOT EXISTS pack VARCHAR")
     print("✓ Database initialized")
 
 

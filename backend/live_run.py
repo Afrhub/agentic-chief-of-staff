@@ -65,6 +65,8 @@ with TestClient(main.app) as c:
     r = c.post("/auth/signup", json={"email": "founder@test.co", "password": "hunter2hunter"})
     check("signup 200 + token", r.status_code == 200 and bool(r.json().get("token")))
     check("signup rejects short password", c.post("/auth/signup", json={"email": "x@y.co", "password": "short"}).status_code == 400)
+    check("signup defaults pack to saas", r.json().get("pack") == "saas")
+    check("/packs lists saas + ecommerce", {p["id"] for p in c.get("/packs").json()} >= {"saas", "ecommerce"})
     fid = r.json()["founder_id"]
 
     print("==> 3. Founder route WITHOUT token -> 401 (the auth gate)")
