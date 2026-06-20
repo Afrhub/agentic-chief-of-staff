@@ -24,6 +24,7 @@ interface AlertCardProps {
   onDecide: (text: string) => void;
   onDelegate: (to: string) => void;
   onDismiss: (reason: string) => void;
+  onDefer: (waitingOn: string, until: string) => void;
 }
 
 const TYPE_META: Record<string, { label: string; accent: string }> = {
@@ -47,10 +48,12 @@ const AlertCard: React.FC<AlertCardProps> = ({
   alert,
   onDecide,
   onDelegate,
-  onDismiss
+  onDismiss,
+  onDefer
 }) => {
-  const [action, setAction] = useState<'none' | 'decide' | 'delegate' | 'dismiss'>('none');
+  const [action, setAction] = useState<'none' | 'decide' | 'delegate' | 'dismiss' | 'defer'>('none');
   const [input, setInput] = useState('');
+  const [until, setUntil] = useState('');
 
   const meta = TYPE_META[alert.type] || { label: 'Signal', accent: 'violet' };
   const pct = Math.round((alert.confidence || 0) * 100);
@@ -59,8 +62,10 @@ const AlertCard: React.FC<AlertCardProps> = ({
     if (action === 'decide') onDecide(input || 'Handling it');
     else if (action === 'delegate') onDelegate(input || 'Team member');
     else if (action === 'dismiss') onDismiss(input || 'Not urgent');
+    else if (action === 'defer') onDefer(input || 'someone', until);
     setAction('none');
     setInput('');
+    setUntil('');
   };
 
   const placeholder =
@@ -68,6 +73,8 @@ const AlertCard: React.FC<AlertCardProps> = ({
       ? 'What did you decide?'
       : action === 'delegate'
       ? 'Who should own this?'
+      : action === 'defer'
+      ? 'Who/what are you waiting on?'
       : 'Why dismiss? (optional)';
 
   return (
@@ -159,6 +166,9 @@ const AlertCard: React.FC<AlertCardProps> = ({
               <button className="btn btn--ghost" onClick={() => setAction('delegate')}>
                 Delegate
               </button>
+              <button className="btn btn--ghost" onClick={() => setAction('defer')}>
+                Defer
+              </button>
               <button className="btn btn--ghost" onClick={() => setAction('dismiss')}>
                 Dismiss
               </button>
@@ -173,6 +183,15 @@ const AlertCard: React.FC<AlertCardProps> = ({
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               />
+              {action === 'defer' && (
+                <input
+                  type="date"
+                  className="actions__date"
+                  value={until}
+                  onChange={(e) => setUntil(e.target.value)}
+                  title="Resurface on (optional)"
+                />
+              )}
               <button className="btn btn--primary group" onClick={handleSubmit}>
                 Confirm
                 <span className="btn__icon" aria-hidden="true">↗</span>
@@ -182,6 +201,7 @@ const AlertCard: React.FC<AlertCardProps> = ({
                 onClick={() => {
                   setAction('none');
                   setInput('');
+                  setUntil('');
                 }}
               >
                 Cancel

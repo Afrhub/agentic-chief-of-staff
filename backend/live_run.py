@@ -89,9 +89,20 @@ with TestClient(main.app) as c:
     ]})
     check("alert surfaced", r.json().get("status") == "surfaced")
     check("alert has synthesized next_decision", "Pause ads" in (r.json().get("next_decision") or ""))
+    aid = r.json()["alert_id"]
 
     print("==> 7. GET alerts (authed, real DB read)")
     r = c.get(f"/founders/{fid}/alerts"); check("1 active alert returned", len(r.json()) == 1)
+
+    print("==> 7b. Defer the alert (waiting on an away person) -> leaves active, auto-resurfaces")
+    import datetime as _dt
+    past = (_dt.datetime.utcnow() - _dt.timedelta(days=1)).isoformat()
+    r = c.post(f"/founders/{fid}/alerts/{aid}/defer", json={"waiting_on": "CFO (on leave)", "until": past})
+    check("defer -> status deferred", r.json().get("status") == "deferred")
+    check("deferred alert leaves active feed", len(c.get(f"/founders/{fid}/alerts").json()) == 0)
+    check("deferred alert shows in deferred view", len(c.get(f"/founders/{fid}/alerts?status=deferred").json()) == 1)
+    _db = main.SessionLocal(); main.reactivate_due_deferrals(_db); _db.close()
+    check("elapsed deferral auto-resurfaces to active", len(c.get(f"/founders/{fid}/alerts").json()) == 1)
 
     print("==> 8. Chat with draft intent -> creates a pending draft (real intent + persist)")
     r = c.post(f"/founders/{fid}/chat", json={"message": "draft a reply to the investor about the dip"})

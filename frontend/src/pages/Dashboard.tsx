@@ -105,6 +105,8 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
 
   const handleDismiss = (alertId: string, reason: string) =>
     act(alertId, 'dismiss', { reason }, 'dismiss alert');
+  const handleDefer = (alertId: string, waitingOn: string, until: string) =>
+    act(alertId, 'defer', { waiting_on: waitingOn, until: until || null }, 'defer');
 
   // Background mesh parallax — pointer position drives --px/--py on the root.
   const paraFrame = useRef<number | null>(null);
@@ -271,6 +273,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
                   onDecide={(text) => handleDecision(alert.id, text)}
                   onDelegate={(to) => handleDelegate(alert.id, to)}
                   onDismiss={(reason) => handleDismiss(alert.id, reason)}
+                  onDefer={(waitingOn, until) => handleDefer(alert.id, waitingOn, until)}
                 />
               </div>
             ))

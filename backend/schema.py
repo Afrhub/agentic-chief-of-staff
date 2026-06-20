@@ -52,7 +52,8 @@ class Alert(Base):
     precedent_context = Column(Text, nullable=True)
 
     # State
-    status = Column(String, default="active")  # active, decided, delegated, dismissed
+    status = Column(String, default="active")  # active, decided, delegated, dismissed, deferred
+    deferred_until = Column(DateTime, nullable=True)  # when a deferred alert auto-resurfaces
 
     founder = relationship("Founder", back_populates="alerts")
 

@@ -91,6 +91,12 @@ class DismissRequest(BaseModel):
     reason: Optional[str] = None
 
 
+class DeferRequest(BaseModel):
+    waiting_on: Optional[str] = None  # the person/info you're blocked on
+    until: Optional[str] = None       # ISO date — auto-resurfaces when it passes
+    reason: Optional[str] = None
+
+
 class AlertCreateRequest(BaseModel):
     signals: List[dict]
 
@@ -340,6 +346,24 @@ _COLLECTORS = {
 }
 
 
+def reactivate_due_deferrals(db: Session) -> int:
+    """Flip deferred alerts whose defer window has elapsed back to active so they
+    re-surface (e.g. the away person is back). Runs each scheduler tick."""
+    now = datetime.utcnow()
+    due = db.query(Alert).filter(
+        Alert.status == "deferred",
+        Alert.deferred_until.isnot(None),
+        Alert.deferred_until <= now,
+    ).all()
+    for a in due:
+        a.status = "active"
+        a.deferred_until = None
+    if due:
+        db.commit()
+        logger.info(f"Reactivated {len(due)} deferred alert(s) whose window elapsed")
+    return len(due)
+
+
 def evaluate_all_founders():
     """Scheduler entrypoint: for each founder, gather signals from every
     connected integration, then run them through the coordinator together.
@@ -352,6 +376,7 @@ def evaluate_all_founders():
     """
     db = SessionLocal()
     try:
+        reactivate_due_deferrals(db)  # bring back any deferrals whose window elapsed
         for founder in db.query(Founder).all():
             collected: List[AlertSignal] = []
             states = db.query(IntegrationState).filter(
@@ -594,6 +619,39 @@ def dismiss_alert(founder_id: str, alert_id: str, body: DismissRequest, db: Sess
     db.commit()
     db.refresh(decision)
     return {"decision_id": decision.id, "status": "dismissed"}
+
+
+@app.post("/founders/{founder_id}/alerts/{alert_id}/defer")
+def defer_alert(founder_id: str, alert_id: str, body: DeferRequest, db: Session = Depends(get_db)):
+    """Park an alert until missing info arrives (e.g. a person who's away). It
+    leaves the active feed and auto-resurfaces once `until` passes; with no
+    `until` it stays parked until a new signal re-raises it."""
+    alert = db.query(Alert).filter(Alert.id == alert_id, Alert.founder_id == founder_id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    until = None
+    if body.until:
+        try:
+            until = datetime.fromisoformat(body.until.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            until = None  # unparseable date → park indefinitely rather than fail
+
+    waiting_on = body.waiting_on or "more info"
+    note = f"Deferred — waiting on {waiting_on}" + (f" until {until.date()}" if until else "")
+    decision = Decision(
+        founder_id=alert.founder_id,
+        alert_id=alert_id,
+        decision_type="defer",
+        decision_text=note,
+        rationale=body.reason,
+    )
+    db.add(decision)
+    alert.status = "deferred"
+    alert.deferred_until = until
+    db.commit()
+    db.refresh(decision)
+    return {"decision_id": decision.id, "status": "deferred", "until": until.isoformat() if until else None}
 
 
 @app.get("/founders/{founder_id}/decisions")
