@@ -6,6 +6,7 @@ import ChatPanel from '../components/ChatPanel';
 import Integrations from '../components/Integrations';
 import Drafts from '../components/Drafts';
 import Scorecard from '../components/Scorecard';
+import Board from '../components/Board';
 import Tilt from '../components/Tilt';
 import { apiFetch } from '../config';
 import { DEMO_ALERTS, isDemoFounder } from '../demo';
@@ -40,6 +41,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
   const [showSources, setShowSources] = useState(false);
   const [showDrafts, setShowDrafts] = useState(false);
   const [showScorecard, setShowScorecard] = useState(false);
+  const [view, setView] = useState<'feed' | 'board'>('board');
   const [theme, setTheme] = useState<'dark' | 'light'>(
     () => (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
   );
@@ -202,6 +204,10 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
             {showScorecard ? 'Hide scorecard' : 'Scorecard'}
             <span className="ghost-pill__icon" aria-hidden="true">{showScorecard ? '×' : '↗'}</span>
           </button>
+          <button className="ghost-pill" onClick={() => setView((v) => (v === 'board' ? 'feed' : 'board'))}>
+            {view === 'board' ? 'Feed view' : 'Board view'}
+            <span className="ghost-pill__icon" aria-hidden="true">⇄</span>
+          </button>
         </div>
       </header>
 
@@ -263,6 +269,9 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
           </div>
         )}
 
+        {view === 'board' ? (
+          <Board founderId={founderId} />
+        ) : (
         <section className="feed">
           {loading ? (
             <div className="feed__loading reveal">Listening to your business…</div>
@@ -291,6 +300,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
             ))
           )}
         </section>
+        )}
 
         <footer className="cos__footer reveal">
           <span className="cos__footer-dot" />

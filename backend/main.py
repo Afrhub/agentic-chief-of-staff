@@ -110,6 +110,11 @@ class ReadingCreate(BaseModel):
     period: Optional[str] = None
 
 
+class VerifyRequest(BaseModel):
+    impact: str                       # positive | neutral | negative
+    note: Optional[str] = None
+
+
 class AlertCreateRequest(BaseModel):
     signals: List[dict]
 
@@ -754,6 +759,69 @@ def delete_metric(founder_id: str, metric_id: str, db: Session = Depends(get_db)
     db.delete(m)
     db.commit()
     return {"status": "deleted"}
+
+
+# ---------------------------------------------------------------------------
+# Kanban board — the decision lifecycle as columns.
+# New -> Decision made / Delegated / Deferred / Dismissed -> Done (verified).
+# "Done" = a decided/delegated alert whose outcome has been verified (impact set).
+# ---------------------------------------------------------------------------
+
+
+@app.get("/founders/{founder_id}/board")
+def get_board(founder_id: str, db: Session = Depends(get_db)):
+    alerts = db.query(Alert).filter(
+        Alert.founder_id == founder_id
+    ).order_by(Alert.triggered_at.desc()).limit(200).all()
+
+    # Latest decision per alert (for the resolution note + verified impact).
+    latest = {}
+    for d in db.query(Decision).filter(
+        Decision.founder_id == founder_id
+    ).order_by(Decision.made_at.desc()).all():
+        if d.alert_id and d.alert_id not in latest:
+            latest[d.alert_id] = d
+
+    cols = {"new": [], "decided": [], "delegated": [], "deferred": [], "dismissed": [], "done": []}
+    for a in alerts:
+        d = latest.get(a.id)
+        card = {
+            "id": a.id,
+            "type": a.alert_type,
+            "title": (a.title or "").replace("Decision: ", ""),
+            "next_decision": a.next_decision,
+            "confidence": a.confidence_score,
+            "triggered_at": a.triggered_at.isoformat(),
+            "note": d.decision_text if d else None,
+            "impact": d.impact if d else None,
+        }
+        if a.status == "active":
+            cols["new"].append(card)
+        elif a.status == "deferred":
+            cols["deferred"].append(card)
+        elif a.status == "dismissed":
+            cols["dismissed"].append(card)
+        elif a.status in ("decided", "delegated"):
+            cols["done" if (d and d.impact) else a.status].append(card)
+    return cols
+
+
+@app.post("/founders/{founder_id}/alerts/{alert_id}/verify")
+def verify_alert(founder_id: str, alert_id: str, body: VerifyRequest, db: Session = Depends(get_db)):
+    """Post-decision check: record whether the call was right (the 'Done' move)."""
+    alert = db.query(Alert).filter(Alert.id == alert_id, Alert.founder_id == founder_id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    d = db.query(Decision).filter(
+        Decision.alert_id == alert_id, Decision.founder_id == founder_id
+    ).order_by(Decision.made_at.desc()).first()
+    if not d:
+        raise HTTPException(status_code=400, detail="Decide or delegate this alert before verifying its outcome")
+    d.impact = body.impact
+    d.outcome = body.note
+    d.outcome_at = datetime.utcnow()
+    db.commit()
+    return {"status": "verified", "impact": d.impact}
 
 
 @app.get("/founders/{founder_id}/integrations")

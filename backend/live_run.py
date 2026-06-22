@@ -150,5 +150,16 @@ with TestClient(main.app) as c:
     check("MRR series carries both readings", len(mrr["series"]) == 2)
     check("Churn 3 <= 5 target (down) -> on track", churn["on_track"] is True)
 
+    print("==> 14. Kanban board — New -> Decided -> Done (verified)")
+    b = c.get(f"/founders/{fid}/board").json()
+    check("reactivated alert sits in 'new'", any(card["id"] == aid for card in b["new"]))
+    c.post(f"/founders/{fid}/alerts/{aid}/decide", json={"decision_text": "Pause ads + retention"})
+    b = c.get(f"/founders/{fid}/board").json()
+    check("decided alert moves to 'decided'", any(card["id"] == aid for card in b["decided"]))
+    c.post(f"/founders/{fid}/alerts/{aid}/verify", json={"impact": "positive", "note": "MRR recovered in 2 weeks"})
+    b = c.get(f"/founders/{fid}/board").json()
+    check("verified alert moves to 'done'", any(card["id"] == aid for card in b["done"]))
+    check("done card carries impact", next(card for card in b["done"] if card["id"] == aid)["impact"] == "positive")
+
 print(f"\n{'ALL ' + str(len(passed)) + ' CHECKS PASSED' if not failed else str(len(failed)) + ' FAILED: ' + str(failed)}")
 raise SystemExit(1 if failed else 0)
