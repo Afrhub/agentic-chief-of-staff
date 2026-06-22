@@ -718,6 +718,42 @@ def connect_integration(founder_id: str, service: str, body: ConnectRequest, db:
     return {"service": service, "status": "connected"}
 
 
+def _vault_path_for(founder_id: str, db: Session) -> str:
+    """Resolve the founder's Obsidian vault: their connected path, else an env
+    override (self-hosted), else the bundled sample vault (so the hosted demo
+    still has a Digital Brain to read)."""
+    row = db.query(IntegrationState).filter(
+        IntegrationState.founder_id == founder_id,
+        IntegrationState.service == "obsidian",
+    ).first()
+    if row and (row.config or {}).get("vault_path"):
+        return row.config["vault_path"]
+    return os.getenv("OBSIDIAN_VAULT_PATH") or os.path.join(os.path.dirname(__file__), "sample_vault")
+
+
+def _recall_brain(founder_id: str, query: str, db: Session, k: int = 3) -> list:
+    """Top-k Obsidian notes relevant to `query` (the Digital Brain), as snippets."""
+    path = _vault_path_for(founder_id, db)
+    if not path or not os.path.isdir(path):
+        return []
+    try:
+        from integrations.obsidian_adapter import read_vault, rank_notes
+        notes = rank_notes(read_vault(path), query, k=k)
+        return [f"{n['title']}: {n['text'][:220].strip()}" for n in notes]
+    except Exception as e:
+        logger.warning(f"brain recall failed: {e}")
+        return []
+
+
+@app.get("/founders/{founder_id}/brain")
+def get_brain(founder_id: str, db: Session = Depends(get_db)):
+    """Digital Brain status: which vault, how many notes, sample titles."""
+    from integrations.obsidian_adapter import read_vault
+    path = _vault_path_for(founder_id, db)
+    notes = read_vault(path) if path and os.path.isdir(path) else []
+    return {"vault_path": path, "notes": len(notes), "titles": [n["title"] for n in notes[:20]]}
+
+
 def _chief_of_staff_reply(founder_id: str, message: str, db: Session) -> str:
     """The chief-of-staff brain. Lazy v1: stuff recent alerts + decisions as
     context and answer (read-only, recommend-don't-execute). Shared by the web
@@ -736,6 +772,11 @@ def _chief_of_staff_reply(founder_id: str, message: str, db: Session) -> str:
     context += "\n\nRECENT DECISIONS:\n" + ("\n".join(
         f"- {d.decision_type}: {d.decision_text}" for d in decisions
     ) or "(none)")
+
+    # Digital Brain: ground the answer in the founder's own Obsidian notes.
+    notes = _recall_brain(founder_id, message, db)
+    if notes:
+        context += "\n\nFROM YOUR NOTES (Obsidian):\n" + "\n".join(f"- {n}" for n in notes)
 
     prompt = (
         "You are the founder's AI Chief of Staff. Answer concisely and like a "

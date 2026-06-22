@@ -30,8 +30,12 @@ def sqlite_init():
     print("  DB ready (sqlite):", [t.name for t in tables])
 
 
+_prompts = []  # capture every prompt so we can assert what reached the LLM
+
+
 def stub_llm(prompt: str) -> str:
     """Return the right shape based on what the prompt asks for."""
+    _prompts.append(prompt)
     if "SUBJECT:" in prompt:  # draft generation
         return ("SUBJECT: Re: pricing + this week's dip\n"
                 "BODY: Hi —\n\nQuick update: we saw a short MRR dip from a pricing "
@@ -125,6 +129,10 @@ with TestClient(main.app) as c:
     print("==> 11. Plain chat question (real reply path)")
     r = c.post(f"/founders/{fid}/chat", json={"message": "what's our churn story?"})
     check("chat answered", bool(r.json().get("reply")))
+
+    print("==> 12. Digital Brain (Obsidian) — reads the vault + grounds the chat")
+    check("brain reads the obsidian vault", c.get(f"/founders/{fid}/brain").json()["notes"] >= 1)
+    check("brain notes injected into chat context", any("FROM YOUR NOTES" in p for p in _prompts))
 
 print(f"\n{'ALL ' + str(len(passed)) + ' CHECKS PASSED' if not failed else str(len(failed)) + ' FAILED: ' + str(failed)}")
 raise SystemExit(1 if failed else 0)
