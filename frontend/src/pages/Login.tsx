@@ -45,7 +45,7 @@ const Login: React.FC<{ onAuthed: (founderId: string) => void }> = ({ onAuthed }
           <span className="bezel__sheen" aria-hidden="true" />
           <div className="auth-brand">
             <span className="island__mark" aria-hidden="true" />
-            <span className="island__name">dCernment</span>
+            <span className="island__name">dCern</span>
           </div>
           <p className="eyebrow">{mode === 'signup' ? 'Create your account' : 'Welcome back'}</p>
 

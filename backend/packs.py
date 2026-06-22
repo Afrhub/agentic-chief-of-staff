@@ -14,7 +14,7 @@ import yaml
 logger = logging.getLogger(__name__)
 
 _PACK_DIR = os.path.join(os.path.dirname(__file__), "packs")
-DEFAULT_PACK_ID = os.getenv("DCERNMENT_DEFAULT_PACK", "saas")
+DEFAULT_PACK_ID = os.getenv("DCERN_DEFAULT_PACK", "saas")
 
 _cache: dict = {}
 _loaded = False

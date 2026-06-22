@@ -32,7 +32,7 @@ from integrations.granola_adapter import GranolaAdapter
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="dCernment")
+app = FastAPI(title="dCern")
 
 
 async def _require_session(request: Request, call_next):

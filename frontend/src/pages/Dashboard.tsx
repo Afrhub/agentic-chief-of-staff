@@ -145,7 +145,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
       <header className="island reveal">
         <div className="island__brand">
           <span className="island__mark" aria-hidden="true" />
-          <span className="island__name">dCernment</span>
+          <span className="island__name">dCern</span>
         </div>
         <div className="island__right">
           {demo && <span className="demo-pill">Demo data</span>}

@@ -5,7 +5,7 @@
 ## The problem
 
 Phase 2's promise is "founder data never leaves the founder's infrastructure."
-But the dCernment must send signal content (emails, Slack snippets,
+But dCern must send signal content (emails, Slack snippets,
 revenue figures) to an LLM to synthesize alerts. If that LLM is a third-party
 cloud API (Anthropic, OpenAI), the data *does* leave the box — to the model
 vendor. So "data never leaves" is in tension with using the best models.

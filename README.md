@@ -1,4 +1,4 @@
-# dCernment — SaaS Platform
+# dCern — SaaS Platform
 
 A real-time decision intelligence platform that monitors a founder's business 24/7 and surfaces only the decisions that matter.
 
@@ -217,4 +217,4 @@ See [/doctrine.md](doctrine.md) for spec-driven development guidelines.
 
 ## License
 
-Proprietary — dCernment
+Proprietary — dCern

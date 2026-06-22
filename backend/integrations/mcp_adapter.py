@@ -3,7 +3,7 @@
 A connected integration with config kind="mcp" declares {mcp_server, tool,
 maps_to, confidence}. This module calls that server's tool and maps each
 returned row to an AlertSignal — so adding a tool is config, not adapter code,
-which is what lets dCernment span industries.
+which is what lets dCern span industries.
 
 Activation: needs the official `mcp` SDK (`pip install mcp`). It is lazily
 imported so the app boots and all existing collectors run without it;
