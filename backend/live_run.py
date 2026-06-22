@@ -134,5 +134,21 @@ with TestClient(main.app) as c:
     check("brain reads the obsidian vault", c.get(f"/founders/{fid}/brain").json()["notes"] >= 1)
     check("brain notes injected into chat context", any("FROM YOUR NOTES" in p for p in _prompts))
 
+    print("==> 13. Precision Scorecard — metrics, readings, target vs actual")
+    mid = c.post(f"/founders/{fid}/scorecard/metrics",
+                 json={"name": "MRR", "owner": "CEO", "target": 20000, "unit": "$", "direction": "up"}).json()["metric_id"]
+    cid = c.post(f"/founders/{fid}/scorecard/metrics",
+                 json={"name": "Churn %", "owner": "CS", "target": 5, "unit": "%", "direction": "down"}).json()["metric_id"]
+    c.post(f"/founders/{fid}/scorecard/metrics/{mid}/readings", json={"value": 16000})
+    c.post(f"/founders/{fid}/scorecard/metrics/{mid}/readings", json={"value": 18000})
+    c.post(f"/founders/{fid}/scorecard/metrics/{cid}/readings", json={"value": 3})
+    sc = c.get(f"/founders/{fid}/scorecard").json()
+    check("scorecard has 2 metrics", len(sc) == 2)
+    mrr = next(m for m in sc if m["name"] == "MRR")
+    churn = next(m for m in sc if m["name"] == "Churn %")
+    check("MRR latest=18000, below 20k target -> off track", mrr["latest"] == 18000 and mrr["on_track"] is False)
+    check("MRR series carries both readings", len(mrr["series"]) == 2)
+    check("Churn 3 <= 5 target (down) -> on track", churn["on_track"] is True)
+
 print(f"\n{'ALL ' + str(len(passed)) + ' CHECKS PASSED' if not failed else str(len(failed)) + ' FAILED: ' + str(failed)}")
 raise SystemExit(1 if failed else 0)

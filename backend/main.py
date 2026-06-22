@@ -19,7 +19,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from database import init_db, get_db, SessionLocal
-from schema import Founder, Alert, Decision, IntegrationState, Draft
+from schema import Founder, Alert, Decision, IntegrationState, Draft, Metric, MetricReading
 from auth import hash_password, verify_password, new_token
 from packs import get_pack, list_packs
 from coordinator import CoordinatorAgent, CoordinatorState, AlertSignal
@@ -95,6 +95,19 @@ class DeferRequest(BaseModel):
     waiting_on: Optional[str] = None  # the person/info you're blocked on
     until: Optional[str] = None       # ISO date — auto-resurfaces when it passes
     reason: Optional[str] = None
+
+
+class MetricCreate(BaseModel):
+    name: str
+    owner: Optional[str] = None
+    target: Optional[float] = None
+    unit: Optional[str] = None
+    direction: str = "up"             # up = higher is better, down = lower
+
+
+class ReadingCreate(BaseModel):
+    value: float
+    period: Optional[str] = None
 
 
 class AlertCreateRequest(BaseModel):
@@ -675,6 +688,72 @@ def get_decision_history(founder_id: str, limit: int = 20, db: Session = Depends
         }
         for d in decisions
     ]
+
+
+# ---------------------------------------------------------------------------
+# Precision Scorecard — metrics with an owner + target, measured over time.
+# (Martell: Targets & Actuals + Assign Ownership + Weekly Measurement.)
+# ---------------------------------------------------------------------------
+
+
+def _on_track(latest, target, direction) -> Optional[bool]:
+    if latest is None or target is None:
+        return None
+    return latest <= target if direction == "down" else latest >= target
+
+
+@app.get("/founders/{founder_id}/scorecard")
+def get_scorecard(founder_id: str, db: Session = Depends(get_db)):
+    """Each metric with its target, latest actual, on/off-track, and a recent
+    series for a sparkline."""
+    out = []
+    for m in db.query(Metric).filter(Metric.founder_id == founder_id).order_by(Metric.created_at).all():
+        readings = db.query(MetricReading).filter(
+            MetricReading.metric_id == m.id
+        ).order_by(MetricReading.recorded_at).all()
+        series = [r.value for r in readings]
+        latest = series[-1] if series else None
+        out.append({
+            "id": m.id, "name": m.name, "owner": m.owner, "target": m.target,
+            "unit": m.unit, "direction": m.direction, "latest": latest,
+            "on_track": _on_track(latest, m.target, m.direction), "series": series[-12:],
+        })
+    return out
+
+
+@app.post("/founders/{founder_id}/scorecard/metrics")
+def create_metric(founder_id: str, body: MetricCreate, db: Session = Depends(get_db)):
+    m = Metric(
+        founder_id=founder_id, name=body.name, owner=body.owner,
+        target=body.target, unit=body.unit, direction=body.direction or "up",
+    )
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+    return {"metric_id": m.id, "name": m.name}
+
+
+@app.post("/founders/{founder_id}/scorecard/metrics/{metric_id}/readings")
+def add_reading(founder_id: str, metric_id: str, body: ReadingCreate, db: Session = Depends(get_db)):
+    m = db.query(Metric).filter(Metric.id == metric_id, Metric.founder_id == founder_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Metric not found")
+    r = MetricReading(metric_id=metric_id, founder_id=founder_id, value=body.value, period=body.period)
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return {"reading_id": r.id, "value": r.value}
+
+
+@app.delete("/founders/{founder_id}/scorecard/metrics/{metric_id}")
+def delete_metric(founder_id: str, metric_id: str, db: Session = Depends(get_db)):
+    m = db.query(Metric).filter(Metric.id == metric_id, Metric.founder_id == founder_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Metric not found")
+    db.query(MetricReading).filter(MetricReading.metric_id == metric_id).delete()
+    db.delete(m)
+    db.commit()
+    return {"status": "deleted"}
 
 
 @app.get("/founders/{founder_id}/integrations")

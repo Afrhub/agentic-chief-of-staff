@@ -5,6 +5,7 @@ import PulsePanel from '../components/PulsePanel';
 import ChatPanel from '../components/ChatPanel';
 import Integrations from '../components/Integrations';
 import Drafts from '../components/Drafts';
+import Scorecard from '../components/Scorecard';
 import Tilt from '../components/Tilt';
 import { apiFetch } from '../config';
 import { DEMO_ALERTS, isDemoFounder } from '../demo';
@@ -38,6 +39,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
   const [showChat, setShowChat] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [showDrafts, setShowDrafts] = useState(false);
+  const [showScorecard, setShowScorecard] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(
     () => (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
   );
@@ -196,6 +198,10 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
               {showHistory ? '×' : '↗'}
             </span>
           </button>
+          <button className="ghost-pill" onClick={() => setShowScorecard((v) => !v)}>
+            {showScorecard ? 'Hide scorecard' : 'Scorecard'}
+            <span className="ghost-pill__icon" aria-hidden="true">{showScorecard ? '×' : '↗'}</span>
+          </button>
         </div>
       </header>
 
@@ -248,6 +254,12 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
         {showHistory && (
           <div className="reveal">
             <DecisionHistory founderId={founderId} />
+          </div>
+        )}
+
+        {showScorecard && (
+          <div className="reveal">
+            <Scorecard founderId={founderId} />
           </div>
         )}
 

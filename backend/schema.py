@@ -155,3 +155,30 @@ class Draft(Base):
     instruction = Column(Text, nullable=True)     # what the founder asked for
     created_at = Column(DateTime, default=datetime.utcnow)
     approved_at = Column(DateTime, nullable=True)
+
+
+class Metric(Base):
+    """Precision Scorecard metric — a number with an owner and a target,
+    measured on a cadence (Martell: Targets & Actuals + Assign Ownership)."""
+    __tablename__ = "metrics"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    founder_id = Column(String, ForeignKey("founders.id"), nullable=False)
+    name = Column(String, nullable=False)
+    owner = Column(String, nullable=True)              # who's accountable
+    target = Column(Float, nullable=True)
+    unit = Column(String, nullable=True)               # %, $, count, …
+    direction = Column(String, default="up")           # up = higher is better, down = lower
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class MetricReading(Base):
+    """A weekly (or ad-hoc) actual for a Metric — the 'Weekly Measurement'."""
+    __tablename__ = "metric_readings"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    metric_id = Column(String, ForeignKey("metrics.id"), nullable=False)
+    founder_id = Column(String, ForeignKey("founders.id"), nullable=False)
+    value = Column(Float, nullable=False)
+    period = Column(String, nullable=True)             # e.g. "2026-W25" or a date label
+    recorded_at = Column(DateTime, default=datetime.utcnow)
