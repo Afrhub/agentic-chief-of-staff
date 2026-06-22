@@ -148,6 +148,18 @@
 .sec--precedent::before { background: linear-gradient(var(--accent), transparent); }
 .sec--precedent .sec__v { color: var(--text-dim); font-style: italic; }
 
+/* 1-3-1 options list (global reset zeroes list padding, so set it back) */
+.sec__opts {
+  list-style: decimal;
+  padding-left: 20px;
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.96rem;
+  line-height: 1.5;
+}
+.sec__opts li { margin: 3px 0; padding-left: 4px; }
+.sec__opts li::marker { color: var(--text-faint); }
+
 /* Decision block */
 .decision {
   position: relative;

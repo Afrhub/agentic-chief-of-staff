@@ -21,6 +21,11 @@ export const DEMO_ALERTS = [
     what_to_do_next:
       '1. Pull the 3 churned accounts — are they all on the new pricing tier?\n2. Cross-check the #customers Slack thread on the price change.\n3. Pause high-CAC paid channels until retention stabilizes.\n4. Draft retention outreach to at-risk accounts.',
     next_decision: 'Should we pause ads and focus on retention this week?',
+    options: [
+      'Pause paid ads and redirect spend to retention outreach',
+      'Hold spend and run a pricing win-back to the 3 churned accounts',
+      'Wait one week and re-measure before acting'
+    ],
     precedent_context:
       '3 months ago a similar $2K MRR drop traced to a competitor price cut. You paused ads and ran retention outreach; MRR recovered to $20K within 2 weeks.',
     trend: [18.2, 18.4, 18.1, 18.5, 18.3, 18.6, 18.2, 18.0, 17.9, 18.1, 17.7, 17.3, 16.5, 16.0],
@@ -44,6 +49,11 @@ export const DEMO_ALERTS = [
     what_to_do_next:
       "1. Confirm Thursday availability.\n2. Assemble the latest metrics deck (MRR, retention, runway).\n3. Decide what to disclose given this week's revenue dip.",
     next_decision: 'Reply today with the deck, or wait until churn is diagnosed?',
+    options: [
+      'Reply today with the current deck and flag the dip',
+      'Wait until the churn is diagnosed, then send a fuller picture',
+      'Delegate the deck prep to the CFO and reply Thursday'
+    ],
     precedent_context: null,
     data_freshness: {
       stripe: '2 min old ✓',

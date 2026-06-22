@@ -6,6 +6,7 @@ from typing import TypedDict, Optional, List
 from datetime import datetime
 import logging
 import hashlib
+import re
 import time
 import os
 
@@ -28,6 +29,7 @@ class CoordinatorState(TypedDict):
     why_it_matters: str
     what_to_do_next: str
     next_decision: str
+    options: List[str]
     similar_past_decision: Optional[str]
     should_surface_alert: bool
 
@@ -177,17 +179,23 @@ You are analyzing multiple signals to determine if a founder needs an urgent dec
 Signals received:
 {signal_summary}
 
-Synthesize these signals into a structured alert with:
+Synthesize these signals into a structured alert using the 1-3-1 format (one
+problem, three options, one recommendation):
 1. WHAT_HAPPENED: Concise summary of what the data shows
 2. WHY_IT_MATTERS: Business impact (loss, risk, opportunity)
-3. WHAT_TO_DO_NEXT: Numbered action steps
-4. NEXT_DECISION: The key decision the founder needs to make
+3. OPTIONS: Exactly THREE distinct options the founder could take
+4. WHAT_TO_DO_NEXT: Numbered action steps for your recommended option
+5. NEXT_DECISION: The single option you recommend (the decision to approve)
 
 Format your response as:
 WHAT_HAPPENED: [text]
 WHY_IT_MATTERS: [text]
+OPTIONS:
+1. [option]
+2. [option]
+3. [option]
 WHAT_TO_DO_NEXT: [numbered list]
-NEXT_DECISION: [decision]
+NEXT_DECISION: [recommended decision]
 """
 
     def _call_with_fallback(self, prompt: str, max_retries: int = 3) -> str:
@@ -219,32 +227,44 @@ NEXT_DECISION: [decision]
         raise Exception("All LLM models exhausted")
 
     def _parse_llm_response(self, response_text: str) -> dict:
-        """Parse structured LLM response."""
-        lines = response_text.split("\n")
+        """Parse the structured 1-3-1 LLM response. OPTIONS is collected as a list
+        of up to three items; the other sections are free text. Best-effort —
+        if OPTIONS is absent, `options` is just [] (no regression)."""
         parsed = {
             "what_happened": "",
             "why_it_matters": "",
             "what_to_do_next": "",
-            "next_decision": ""
+            "next_decision": "",
+            "options": [],
         }
 
         current_section = None
-        for line in lines:
+        for line in response_text.split("\n"):
             if line.startswith("WHAT_HAPPENED:"):
                 current_section = "what_happened"
-                parsed[current_section] = line.replace("WHAT_HAPPENED:", "").strip()
+                parsed[current_section] = line.split(":", 1)[1].strip()
             elif line.startswith("WHY_IT_MATTERS:"):
                 current_section = "why_it_matters"
-                parsed[current_section] = line.replace("WHY_IT_MATTERS:", "").strip()
+                parsed[current_section] = line.split(":", 1)[1].strip()
+            elif line.startswith("OPTIONS:"):
+                current_section = "options"
+                rest = line.split(":", 1)[1].strip()
+                if rest:
+                    parsed["options"].append(rest)
             elif line.startswith("WHAT_TO_DO_NEXT:"):
                 current_section = "what_to_do_next"
-                parsed[current_section] = line.replace("WHAT_TO_DO_NEXT:", "").strip()
+                parsed[current_section] = line.split(":", 1)[1].strip()
             elif line.startswith("NEXT_DECISION:"):
                 current_section = "next_decision"
-                parsed[current_section] = line.replace("NEXT_DECISION:", "").strip()
+                parsed[current_section] = line.split(":", 1)[1].strip()
+            elif current_section == "options" and line.strip():
+                cleaned = re.sub(r"^\s*(\d+[.)]|[-*])\s*", "", line).strip()
+                if cleaned:
+                    parsed["options"].append(cleaned)
             elif current_section and line.strip():
                 parsed[current_section] += "\n" + line
 
+        parsed["options"] = parsed["options"][:3]
         return parsed
 
     def _embed_decision_context(self, text: str) -> list:

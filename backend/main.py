@@ -202,6 +202,7 @@ def process_signals(founder_id: str, signals: List[AlertSignal], db: Session) ->
         "why_it_matters": "",
         "what_to_do_next": "",
         "next_decision": "",
+        "options": [],
         "similar_past_decision": None,
         "should_surface_alert": False,
     }
@@ -219,6 +220,7 @@ def process_signals(founder_id: str, signals: List[AlertSignal], db: Session) ->
         why_it_matters=final_state["why_it_matters"],
         what_to_do_next=final_state["what_to_do_next"],
         next_decision=final_state["next_decision"],
+        options=final_state.get("options") or [],
         signals=_jsonable([s.dict() for s in signals]),
         data_freshness=_get_freshness_indicators(founder_id, db),
         confidence_score=final_state["confidence_score"],
@@ -550,6 +552,7 @@ def get_alerts(founder_id: str, status: str = "active", db: Session = Depends(ge
             "why_it_matters": a.why_it_matters,
             "what_to_do_next": a.what_to_do_next,
             "next_decision": a.next_decision,
+            "options": a.options or [],
             "precedent_context": a.precedent_context,
             "data_freshness": a.data_freshness,
             "confidence": a.confidence_score,

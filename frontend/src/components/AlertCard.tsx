@@ -11,6 +11,7 @@ interface Alert {
   why_it_matters: string;
   what_to_do_next: string;
   next_decision: string;
+  options?: string[];
   precedent_context?: string | null;
   trend?: number[];
   data_freshness: Record<string, string>;
@@ -140,6 +141,17 @@ const AlertCard: React.FC<AlertCardProps> = ({
             <section className="sec sec--precedent">
               <span className="sec__k">What happened last time</span>
               <p className="sec__v">{alert.precedent_context}</p>
+            </section>
+          )}
+
+          {alert.options && alert.options.length > 0 && (
+            <section className="sec">
+              <span className="sec__k">Options</span>
+              <ol className="sec__opts">
+                {alert.options.map((opt, i) => (
+                  <li key={i}>{opt}</li>
+                ))}
+              </ol>
             </section>
           )}
 

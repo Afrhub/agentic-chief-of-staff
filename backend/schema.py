@@ -40,7 +40,8 @@ class Alert(Base):
     what_happened = Column(Text, nullable=False)
     why_it_matters = Column(Text, nullable=False)
     what_to_do_next = Column(Text, nullable=False)
-    next_decision = Column(String, nullable=True)
+    next_decision = Column(String, nullable=True)       # the recommendation (1-3-1: the "1")
+    options = Column(JSON, nullable=True)               # the three options considered (1-3-1: the "3")
 
     # Supporting data
     signals = Column(JSON, nullable=False)  # List of triggering signals with timestamps

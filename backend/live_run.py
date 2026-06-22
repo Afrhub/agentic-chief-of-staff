@@ -37,9 +37,12 @@ def stub_llm(prompt: str) -> str:
                 "BODY: Hi —\n\nQuick update: we saw a short MRR dip from a pricing "
                 "test; here's the diagnosis and the recovery plan. Happy to walk "
                 "through Thursday.\n\nBest,\n[Founder]")
-    if "WHAT_HAPPENED" in prompt:  # alert synthesis
+    if "WHAT_HAPPENED" in prompt:  # alert synthesis (1-3-1)
         return ("WHAT_HAPPENED: MRR fell 11% ($18K->$16K) in 24h with 3 cancellations.\n"
                 "WHY_IT_MATTERS: ~$24K ARR at risk; clustered with pricing complaints.\n"
+                "OPTIONS:\n1. Pause ads and focus on retention\n"
+                "2. Hold spend and run a pricing win-back\n"
+                "3. Do nothing for a week and re-measure\n"
                 "WHAT_TO_DO_NEXT: 1. Pull the 3 churned accounts.\n2. Pause high-CAC ads.\n"
                 "NEXT_DECISION: Pause ads and focus on retention this week?")
     return "Here's my read: revenue dipped on a pricing test — recommend pausing ads while we diagnose."
@@ -93,6 +96,7 @@ with TestClient(main.app) as c:
 
     print("==> 7. GET alerts (authed, real DB read)")
     r = c.get(f"/founders/{fid}/alerts"); check("1 active alert returned", len(r.json()) == 1)
+    check("alert carries 3 options (1-3-1)", len(r.json()[0].get("options") or []) == 3)
 
     print("==> 7b. Defer the alert (waiting on an away person) -> leaves active, auto-resurfaces")
     import datetime as _dt

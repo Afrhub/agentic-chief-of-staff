@@ -38,6 +38,7 @@ def init_db():
             conn.exec_driver_sql("ALTER TABLE founders ADD COLUMN IF NOT EXISTS session_token VARCHAR")
             conn.exec_driver_sql("ALTER TABLE founders ADD COLUMN IF NOT EXISTS pack VARCHAR")
             conn.exec_driver_sql("ALTER TABLE alerts ADD COLUMN IF NOT EXISTS deferred_until TIMESTAMP")
+            conn.exec_driver_sql("ALTER TABLE alerts ADD COLUMN IF NOT EXISTS options JSON")
     print("✓ Database initialized")
 
 
