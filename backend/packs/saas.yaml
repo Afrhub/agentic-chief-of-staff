@@ -33,3 +33,31 @@ sources:
   - axis: meetings
     kind: adapter
     service: granola
+# Default scorecard targets seeded at onboarding (calibration). The founder can
+# edit any of these; a connected data source can later baseline them from history.
+metrics:
+  - name: MRR
+    owner: CEO
+    target: 20000
+    unit: $
+    direction: up
+  - name: Net Revenue Retention
+    owner: Customer Success
+    target: 110
+    unit: "%"
+    direction: up
+  - name: Churn
+    owner: Customer Success
+    target: 5
+    unit: "%"
+    direction: down
+  - name: Runway
+    owner: Finance
+    target: 18
+    unit: " mo"
+    direction: up
+  - name: Pipeline
+    owner: Sales
+    target: 50000
+    unit: $
+    direction: up

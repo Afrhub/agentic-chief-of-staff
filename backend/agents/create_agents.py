@@ -52,9 +52,16 @@ def main():
         env_id = _create("environments", _load("environment.yaml"))["id"]
         print(f"DCERN_ENV_ID={env_id}")
 
+    sys.path.insert(0, HERE)
+    from identities import persona_for  # same dir; gives each agent its human voice
+
     ids = []
     for axis in AXES:
-        a = _create("agents", _load(f"{axis}.agent.yaml"))
+        spec = _load(f"{axis}.agent.yaml")
+        persona = persona_for(axis)
+        if persona:  # prepend the identity (James/Sofia/...) without touching the JSON contract
+            spec["system"] = persona + "\n\n" + spec.get("system", "")
+        a = _create("agents", spec)
         ids.append(a["id"])
         print(f"{axis.upper()}_AGENT_ID={a['id']}")
 

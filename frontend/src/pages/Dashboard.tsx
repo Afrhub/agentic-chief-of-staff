@@ -6,6 +6,7 @@ import ChatPanel from '../components/ChatPanel';
 import Integrations from '../components/Integrations';
 import Drafts from '../components/Drafts';
 import Scorecard from '../components/Scorecard';
+import Fleet from '../components/Fleet';
 import Board from '../components/Board';
 import Tilt from '../components/Tilt';
 import { apiFetch } from '../config';
@@ -41,6 +42,7 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
   const [showSources, setShowSources] = useState(false);
   const [showDrafts, setShowDrafts] = useState(false);
   const [showScorecard, setShowScorecard] = useState(false);
+  const [showTeam, setShowTeam] = useState(false);
   const [view, setView] = useState<'feed' | 'board'>('board');
   const [theme, setTheme] = useState<'dark' | 'light'>(
     () => (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
@@ -204,6 +206,10 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
             {showScorecard ? 'Hide scorecard' : 'Scorecard'}
             <span className="ghost-pill__icon" aria-hidden="true">{showScorecard ? '×' : '↗'}</span>
           </button>
+          <button className="ghost-pill" onClick={() => setShowTeam((v) => !v)}>
+            {showTeam ? 'Hide team' : 'Team'}
+            <span className="ghost-pill__icon" aria-hidden="true">{showTeam ? '×' : '↗'}</span>
+          </button>
           <button className="ghost-pill" onClick={() => setView((v) => (v === 'board' ? 'feed' : 'board'))}>
             {view === 'board' ? 'Feed view' : 'Board view'}
             <span className="ghost-pill__icon" aria-hidden="true">⇄</span>
@@ -266,6 +272,12 @@ const Dashboard: React.FC<DashboardProps> = ({ founderId, onLogout }) => {
         {showScorecard && (
           <div className="reveal">
             <Scorecard founderId={founderId} />
+          </div>
+        )}
+
+        {showTeam && (
+          <div className="reveal">
+            <Fleet founderId={founderId} />
           </div>
         )}
 

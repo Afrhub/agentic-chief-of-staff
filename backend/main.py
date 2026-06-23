@@ -472,6 +472,7 @@ def signup(body: AuthRequest, db: Session = Depends(get_db)):
     db.add(f)
     db.commit()
     db.refresh(f)
+    _calibrate(f.id, pack_id, db)  # onboarding: seed the scorecard targets from the pack
     return {"founder_id": f.id, "token": token, "pack": pack_id}
 
 
@@ -492,6 +493,15 @@ def login(body: AuthRequest, db: Session = Depends(get_db)):
 def get_packs():
     """Available vertical packs (industry framings) — drives the onboarding picker."""
     return list_packs()
+
+
+@app.get("/agents/fleet")
+def agents_fleet():
+    """The dCern agent fleet: human identities + each axis agent's model and live
+    data source. Product metadata (no founder data) — drives the dashboard's team
+    view. The personas here are also prepended to the agents at creation time."""
+    from agents.identities import fleet_meta, COORDINATOR
+    return {"coordinator": COORDINATOR, "agents": fleet_meta()}
 
 
 @app.get("/health")
@@ -736,6 +746,37 @@ def create_metric(founder_id: str, body: MetricCreate, db: Session = Depends(get
     db.commit()
     db.refresh(m)
     return {"metric_id": m.id, "name": m.name}
+
+
+def _calibrate(founder_id: str, pack_id: str, db: Session) -> list:
+    """Onboarding calibration: seed the founder's scorecard with the pack's default
+    metrics + targets (idempotent by name) — the per-axis 'business parameters' the
+    agents judge against. A connected data source can baseline these from history later."""
+    existing = {m.name for m in db.query(Metric).filter(Metric.founder_id == founder_id).all()}
+    created = []
+    for spec in get_pack(pack_id).get("metrics", []):
+        if not spec.get("name") or spec["name"] in existing:
+            continue
+        db.add(Metric(
+            founder_id=founder_id, name=spec["name"], owner=spec.get("owner"),
+            target=spec.get("target"), unit=spec.get("unit"),
+            direction=spec.get("direction", "up"),
+        ))
+        created.append(spec["name"])
+    if created:
+        db.commit()
+    return created
+
+
+@app.post("/founders/{founder_id}/scorecard/calibrate")
+def calibrate_scorecard(founder_id: str, db: Session = Depends(get_db)):
+    """Re-run onboarding calibration: set each axis's targets from the founder's
+    pack. Idempotent — only adds metrics not already present (existing targets,
+    edited or not, are left alone)."""
+    f = db.query(Founder).filter(Founder.id == founder_id).first()
+    pack_id = (f.pack if f else None) or get_pack(None).get("id")
+    created = _calibrate(founder_id, pack_id, db)
+    return {"pack": pack_id, "created": created}
 
 
 @app.post("/founders/{founder_id}/scorecard/metrics/{metric_id}/readings")

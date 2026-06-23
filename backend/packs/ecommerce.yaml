@@ -36,3 +36,30 @@ sources:
     tool: list_recent_conversations
     maps_to: support_spike
     confidence: 0.8
+# Default scorecard targets seeded at onboarding (calibration); founder-editable.
+metrics:
+  - name: Revenue
+    owner: CEO
+    target: 100000
+    unit: $
+    direction: up
+  - name: AOV
+    owner: Growth
+    target: 65
+    unit: $
+    direction: up
+  - name: ROAS
+    owner: Growth
+    target: 3
+    unit: x
+    direction: up
+  - name: Refund rate
+    owner: Ops
+    target: 4
+    unit: "%"
+    direction: down
+  - name: Repeat purchase rate
+    owner: Retention
+    target: 30
+    unit: "%"
+    direction: up

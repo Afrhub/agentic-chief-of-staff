@@ -343,6 +343,74 @@ A conversational agent with read access to the founder's connected tools and mem
 
 ---
 
-**Doctrine version:** 1.1  
-**Last updated:** 2026-06-18  
-**Status:** v1 ready for implementation · v2 (CoS agent) specced, not built
+## v3 — The Agent Fleet (autonomous monitoring tier)
+
+v1 watches via server-side adapters; v2 adds the conversational CoS. v3 makes the
+*watching* a team of specialist **Managed Agents** (Anthropic-hosted), one per
+business axis, each returning a structured signal that the v1 coordinator
+corroborates. Built and live — deployed on Render (API) + Netlify (UI); agents run
+in the founder's own Anthropic workspace.
+
+### The team (human identities)
+Each axis agent has a persona — **voice + prioritisation only**. It never changes
+the contract: agents return structured JSON and **never decide whether to alert**
+(the coordinator's gate does). Single source of truth: `backend/agents/identities.py`;
+surfaced at `GET /agents/fleet` and in the dashboard's **Team** view; prepended to
+each agent's system prompt at creation (`create_agents.py`).
+
+| Agent | Axis | Role | Model | Live source |
+|-------|------|------|-------|-------------|
+| **James** | money | Finance Director | Haiku 4.5 | Stripe (MCP, wired) |
+| **Sofia** | customers | Head of Customer Success | Haiku 4.5 | Intercom (planned) |
+| **Marcus** | comms | Chief of Staff / gatekeeper | Sonnet 4.6 | Slack/Gmail (planned) |
+| **Priya** | meetings | Executive Assistant | Sonnet 4.6 | Granola (MCP, wired) |
+| **David** | ops | Head of Operations | Haiku 4.5 | Datadog (planned) |
+| **dCern** | — | Chief of Staff (coordinator) | Opus 4.8 | synthesises the team |
+
+**Mixed-model by design:** Haiku for the metric/number axes (cheap, high-frequency),
+Sonnet for the free-text/judgment axes (inbox, transcripts). The 1-3-1 *synthesis* is
+the coordinator's job (Sonnet/Opus), so high-frequency scanning stays cheap without
+dumbing down the alert. (Retired model IDs were corrected to `claude-sonnet-4-6` /
+`claude-haiku-4-5`; agents on `claude-opus-4-8`.)
+
+### Live data + credentials
+Each agent declares its connector's **MCP server** in its YAML (e.g. `mcp.stripe.com`,
+`mcp.granola.ai/mcp`). The OAuth credential lives in an Anthropic **vault** attached at
+session time (`DCERN_VAULT_ID`) — never on the agent, never in our DB. Agents prefer
+live data and **fall back to the scorecard snapshot** when no vault/source is wired
+(graceful degradation). Independent sources are what make cross-axis corroboration
+*mean* something — not one number reframed five ways.
+
+### Corroboration gate (refined 2026-06-23)
+A card surfaces only when **≥2 distinct axes** agree **and** confidence clears the bar.
+Confidence is judged on the **strongest signal per distinct type (top-2)** — so moderate
+extras no longer dilute it — and the bar **drops 0.05 per axis beyond the second**
+(floor 0.65), so breadth raises urgency instead of averaging it away. Two lone moderate
+signals still suppress. Implemented in `coordinator.analyze_signals`. This refines (not
+replaces) edge-case #2's "≥2 independent signals" rule.
+
+### Onboarding calibration
+At signup the founder's scorecard is **auto-seeded with their pack's default targets**
+(`packs/<id>.yaml` → `metrics:`) — the per-axis "business parameters" each agent judges
+against. Idempotent; re-runnable via `POST /scorecard/calibrate`; fully founder-editable.
+A connected source can baseline these from history later (planned).
+
+### Endpoints
+- `POST /founders/{id}/agents/{axis}/run` — one agent.
+- `POST /founders/{id}/agents/run` — the fleet → corroborate → maybe a card. Returns
+  `not_configured` only when no agents are set up; `no_findings` + per-axis `errors`
+  when they ran but produced nothing (e.g. low balance) — never conflated.
+- `GET /agents/fleet` — roster (identities + model + source) for the UI.
+- `POST /founders/{id}/scorecard/calibrate` — (re)seed pack-default targets.
+
+### Status
+- ✅ Fleet live end-to-end: 5 agents, corroboration gate, onboarding calibration, Team view.
+- ✅ money → Stripe MCP and meetings → Granola MCP wired (need a vault attached to go live).
+- ⏳ customers/comms/ops live sources (Intercom/Slack/Datadog) — same pattern, not yet wired.
+- ⏳ data-baselined calibration; 24/7 scheduled deployment (coordinator agent + cron).
+
+---
+
+**Doctrine version:** 1.2  
+**Last updated:** 2026-06-23  
+**Status:** v1 ready · v2 (CoS agent) specced · v3 (agent fleet) built & live
