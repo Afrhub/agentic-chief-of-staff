@@ -11,16 +11,27 @@ system: |
     "confidence": 0.0-1.0, "summary": "one concise sentence",
     "data": { "who": "", "what": "" } }
   If nothing is decision-worthy, return {"has_signal": false}. Prefer LIVE data
-  from the Slack MCP tools when available (channels, mentions, escalations);
-  otherwise fall back to the snapshot. Never invent.
-# Phase 3 live data via MCP. Slack's OAuth credential lives in a VAULT attached at
-# session time (DCERN_VAULT_ID) — never on the agent. Same pattern as money/Stripe.
-# (Email/calendar can be added as further mcp_servers — Gmail/Google Calendar.)
+  from the Slack, Gmail, and Google Calendar MCP tools when available (channel
+  mentions/escalations; investor or VIP email; time-sensitive holds and calendar
+  conflicts); otherwise fall back to the snapshot. Never invent.
+# Phase 3 live data via MCP. Each connector's OAuth credential lives in a VAULT
+# attached at session time (DCERN_VAULT_ID) — never on the agent. Comms spans the
+# founder's three inbound channels: Slack + Gmail + Google Calendar.
 mcp_servers:
   - type: url
     name: slack
     url: https://mcp.slack.com/mcp
+  - type: url
+    name: gmail
+    url: https://gmailmcp.googleapis.com/mcp/v1
+  - type: url
+    name: gcal
+    url: https://calendarmcp.googleapis.com/mcp/v1
 tools:
   - type: agent_toolset_20260401
   - type: mcp_toolset
     mcp_server_name: slack
+  - type: mcp_toolset
+    mcp_server_name: gmail
+  - type: mcp_toolset
+    mcp_server_name: gcal

@@ -399,7 +399,11 @@ Wired MCP endpoints (verified against each vendor's docs, 2026-06-23):
 
 The **"· live" badge in the Team view reflects the wiring, not a verified connection** —
 an axis only pulls live once its connector is authenticated in the attached vault.
-Comms (Marcus) can take further `mcp_servers` for Gmail / Google Calendar alongside Slack.
+
+Comms (Marcus) spans the founder's three inbound channels — it declares **three** MCP
+servers: Slack (`https://mcp.slack.com/mcp`), Gmail (`https://gmailmcp.googleapis.com/mcp/v1`),
+and Google Calendar (`https://calendarmcp.googleapis.com/mcp/v1`), all OAuth via the vault.
+An axis can declare any number of `mcp_servers`; the Team view labels it by the first.
 
 ### Corroboration gate (refined 2026-06-23)
 A card surfaces only when **≥2 distinct axes** agree **and** confidence clears the bar.
