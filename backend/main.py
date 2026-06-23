@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks, R
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime
@@ -11,6 +11,7 @@ import os
 import hmac
 import hashlib
 import time
+import threading
 import json
 import base64
 import httpx
@@ -55,16 +56,81 @@ async def _require_session(request: Request, call_next):
     return await call_next(request)
 
 
-# Order matters: session gate added first (inner), CORS added last (outer), so
-# even a 401 from the gate carries CORS headers and the browser can read it.
-app.add_middleware(BaseHTTPMiddleware, dispatch=_require_session)
+# --- Rate limiting (in-process sliding window) ---------------------------------
+# ponytail: per-process counters — fine for single-instance Render. Multi-instance
+# needs shared state (e.g. Redis); per-worker counters don't sync. Auth paths get a
+# tight bucket (brute-force guard), everything else a generous one.
+_RL_LOCK = threading.Lock()
+_RL_HITS: dict = {}
+_RL_RULES = [("/auth/", 12, 300),   # 12 requests / 5 min on auth
+             ("/", 240, 60)]        # 240 requests / min elsewhere
+
+
+def _client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for", "")  # Render/proxies set this
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "?"
+
+
+async def _rate_limit(request: Request, call_next):
+    if request.method == "OPTIONS":
+        return await call_next(request)
+    path = request.url.path
+    limit, window = next((l, w) for pre, l, w in _RL_RULES if path.startswith(pre))
+    key = f"{_client_ip(request)}:{'auth' if path.startswith('/auth/') else 'gen'}"
+    now = time.time()
+    with _RL_LOCK:
+        hits = [t for t in _RL_HITS.get(key, []) if t > now - window]
+        if len(hits) >= limit:
+            _RL_HITS[key] = hits
+            return JSONResponse(
+                {"detail": "Too many requests — slow down."},
+                status_code=429, headers={"Retry-After": str(int(hits[0] + window - now) + 1)},
+            )
+        hits.append(now)
+        _RL_HITS[key] = hits
+    return await call_next(request)
+
+
+_SEC_HEADERS = {
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",  # JSON API
+}
+
+
+async def _security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    for k, v in _SEC_HEADERS.items():
+        resp.headers.setdefault(k, v)
+    for leak in ("server", "x-powered-by"):
+        if leak in resp.headers:
+            del resp.headers[leak]
+    return resp
+
+
+# Middleware order: last-added runs first (outermost). Outer→inner we want:
+# security-headers → CORS → rate-limit → session gate → route. So 401/429 responses
+# still carry CORS + security headers, and rate-limiting throttles even unauth'd hits.
+_ALLOWED_ORIGINS = [o.strip() for o in os.getenv(
+    "DCERN_ALLOWED_ORIGINS",
+    "https://dcern.netlify.app,https://ai-c-o-s.netlify.app,http://localhost:3000,http://localhost:4173",
+).split(",") if o.strip()]
+
+app.add_middleware(BaseHTTPMiddleware, dispatch=_require_session)   # inner
+app.add_middleware(BaseHTTPMiddleware, dispatch=_rate_limit)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_ALLOWED_ORIGINS,          # explicit allowlist (was "*")
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+app.add_middleware(BaseHTTPMiddleware, dispatch=_security_headers)  # outermost
 
 init_db()
 
@@ -120,19 +186,19 @@ class AlertCreateRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(max_length=8000)
     history: Optional[List[dict]] = None  # [{role, content}], optional
 
 
 class ConnectRequest(BaseModel):
-    access_token: str
+    access_token: str = Field(max_length=2000)
     config: Optional[dict] = None
 
 
 class DraftRequest(BaseModel):
-    instruction: str
-    channel: str = "email"          # email | slack
-    recipient: Optional[str] = None
+    instruction: str = Field(max_length=8000)
+    channel: str = Field(default="email", max_length=20)   # email | slack
+    recipient: Optional[str] = Field(default=None, max_length=320)
 
 
 class FounderRequest(BaseModel):
@@ -143,9 +209,9 @@ class FounderRequest(BaseModel):
 
 
 class AuthRequest(BaseModel):
-    email: str
-    password: str
-    pack: Optional[str] = None  # vertical pack id chosen at signup (industry)
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=200)  # min enforced in /auth/signup; max guards PBKDF2 DoS
+    pack: Optional[str] = Field(default=None, max_length=40)  # vertical pack id chosen at signup
 
 
 # ---------------------------------------------------------------------------

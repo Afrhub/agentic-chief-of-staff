@@ -193,5 +193,15 @@ with TestClient(main.app) as c:
     ]})
     check("two moderate signals -> still suppressed", r.json().get("status") == "suppressed")
 
+    print("==> 17. Security hardening — headers, input bounds, rate limiting")
+    h = c.get("/health").headers
+    check("security headers set (nosniff + frame DENY + HSTS)",
+          h.get("x-content-type-options") == "nosniff" and h.get("x-frame-options") == "DENY"
+          and "max-age" in (h.get("strict-transport-security") or ""))
+    check("oversized password rejected at the edge (422)",
+          c.post("/auth/signup", json={"email": "big@y.co", "password": "x" * 500}).status_code == 422)
+    codes = [c.post("/auth/login", json={"email": "nope@y.co", "password": "whatever8"}).status_code for _ in range(15)]
+    check("auth brute-force is rate limited (429 seen)", 429 in codes)
+
 print(f"\n{'ALL ' + str(len(passed)) + ' CHECKS PASSED' if not failed else str(len(failed)) + ' FAILED: ' + str(failed)}")
 raise SystemExit(1 if failed else 0)
