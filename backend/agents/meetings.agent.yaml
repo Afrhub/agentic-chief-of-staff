@@ -9,6 +9,17 @@ system: |
   Return ONLY a fenced ```json block, nothing else:
   { "has_signal": true, "type": "meeting_action", "confidence": 0.0-1.0,
     "summary": "one concise sentence", "data": { "meeting": "", "item": "" } }
-  If nothing is decision-worthy, return {"has_signal": false}. Use only the snapshot.
+  If nothing is decision-worthy, return {"has_signal": false}. Prefer live data
+  from the Granola MCP tools when available; otherwise use the snapshot.
+# Phase 3 live data via MCP. The OAuth credential lives in a VAULT attached at
+# session time (vault_ids) — never on the agent. Granola's MCP fits an agent
+# (vs dCern's server-side REST pull). Other axes declare their connector's MCP
+# server the same way (Stripe / Intercom / Slack / Datadog) — see PROD.md.
+mcp_servers:
+  - type: url
+    name: granola
+    url: https://mcp.granola.ai/mcp
 tools:
   - type: agent_toolset_20260401
+  - type: mcp_toolset
+    mcp_server_name: granola

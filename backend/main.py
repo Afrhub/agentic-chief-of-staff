@@ -862,7 +862,11 @@ def _run_axis(founder_id: str, axis: str, db: Session):
     if not (agent_id and os.getenv("DCERN_ENV_ID") and os.getenv("ANTHROPIC_API_KEY")):
         return None
     from agents.managed_agents import run_axis_agent
-    return run_axis_agent(agent_id, os.environ["DCERN_ENV_ID"], _axis_context(founder_id, axis, db))
+    vault = os.getenv("DCERN_VAULT_ID")  # credentials for the agent's MCP tools
+    return run_axis_agent(
+        agent_id, os.environ["DCERN_ENV_ID"], _axis_context(founder_id, axis, db),
+        vault_ids=[vault] if vault else None,
+    )
 
 
 @app.post("/founders/{founder_id}/agents/{axis}/run")
@@ -915,6 +919,30 @@ def run_agent_fleet(founder_id: str, db: Session = Depends(get_db)):
         "alert_status": "surfaced" if alert else "suppressed",
         "alert_id": alert.id if alert else None,
     }
+
+
+@app.post("/founders/{founder_id}/agents/deployments/sync")
+def sync_deployment(founder_id: str, db: Session = Depends(get_db)):
+    """Ingest the latest scheduled-deployment run's finding (the 24/7 path: an
+    Anthropic cron fires the coordinator, this pulls its result into dCern).
+    No-ops until DCERN_DEPLOYMENT_ID is set — see backend/agents/PROD.md."""
+    dep = os.getenv("DCERN_DEPLOYMENT_ID")
+    if not (dep and os.getenv("ANTHROPIC_API_KEY")):
+        return {"status": "not_configured",
+                "detail": "Set DCERN_DEPLOYMENT_ID and ANTHROPIC_API_KEY — see backend/agents/PROD.md"}
+    try:
+        from agents.managed_agents import latest_deployment_finding
+        finding = latest_deployment_finding(dep)
+    except Exception as e:
+        logger.error(f"deployment sync failed: {e}")
+        raise HTTPException(status_code=502, detail="Deployment sync failed")
+    result = {"finding": finding}
+    if finding.get("has_signal"):
+        alert = process_signals(founder_id, [AlertSignal(
+            type=finding.get("type", "revenue_anomaly"), confidence=float(finding.get("confidence", 0.8)),
+            timestamp=datetime.utcnow(), data=finding.get("data", {}))], db)
+        result["alert_status"] = "surfaced" if alert else "suppressed"
+    return result
 
 
 @app.get("/founders/{founder_id}/integrations")

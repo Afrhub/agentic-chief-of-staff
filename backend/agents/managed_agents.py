@@ -33,12 +33,16 @@ def _headers() -> dict:
     }
 
 
-def run_axis_agent(agent_id: str, environment_id: str, context: str, timeout_s: int = 120) -> dict:
-    """Create a session for `agent_id` in `environment_id`, send the axis context,
-    wait for the agent to go idle, and return its parsed JSON finding."""
+def run_axis_agent(agent_id: str, environment_id: str, context: str,
+                   vault_ids: list = None, timeout_s: int = 120) -> dict:
+    """Create a session for `agent_id` in `environment_id` (optionally attaching
+    credential vaults so the agent's MCP tools authenticate), send the axis
+    context, wait for idle, and return its parsed JSON finding."""
+    body = {"agent": agent_id, "environment_id": environment_id}
+    if vault_ids:
+        body["vault_ids"] = vault_ids
     with httpx.Client(timeout=30) as c:
-        s = c.post(f"{_API}/sessions", headers=_headers(),
-                   json={"agent": agent_id, "environment_id": environment_id})
+        s = c.post(f"{_API}/sessions", headers=_headers(), json=body)
         s.raise_for_status()
         sid = s.json()["id"]
         c.post(
@@ -91,6 +95,26 @@ def _parse_finding(text: str) -> dict:
         except Exception:
             continue
     return {"has_signal": False, "raw": text[:500]}
+
+
+def latest_deployment_finding(deployment_id: str) -> dict:
+    """Pull the newest scheduled-deployment run's session finding, so dCern can
+    ingest what a cron-fired coordinator produced (the 24/7 path). Newest run
+    with a session_id wins; returns has_signal=False if there's nothing yet."""
+    with httpx.Client(timeout=30) as c:
+        runs = c.get(f"{_API}/deployment_runs", headers=_headers(),
+                     params={"deployment_id": deployment_id})
+        runs.raise_for_status()
+        sid = next((r.get("session_id") for r in runs.json().get("data", []) if r.get("session_id")), None)
+        if not sid:
+            return {"has_signal": False, "note": "no completed deployment run yet"}
+        ev = c.get(f"{_API}/sessions/{sid}/events", headers=_headers())
+        ev.raise_for_status()
+        texts = []
+        for e in ev.json().get("data", []):
+            if e.get("type") == "agent.message":
+                texts += [b.get("text", "") for b in e.get("content", []) if b.get("type") == "text"]
+    return _parse_finding("\n".join(texts))
 
 
 if __name__ == "__main__":

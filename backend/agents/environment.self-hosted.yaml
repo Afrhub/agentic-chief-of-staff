@@ -1,0 +1,8 @@
+# Phase 3 — data-residency environment. Tool execution + data run on YOUR
+# infrastructure (the founder's box / VPC); only the agent loop runs on
+# Anthropic's side. This is the "data stays on the founder's servers" prod model.
+#   ant beta:environments create < backend/agents/environment.self-hosted.yaml --transform id -r
+# Then run a worker on that infra (see PROD.md) and point DCERN_ENV_ID at this env.
+name: dcern-self-hosted
+config:
+  type: self_hosted

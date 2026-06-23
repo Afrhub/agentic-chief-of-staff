@@ -1,0 +1,18 @@
+# Phase 3 — 24/7 scheduled deployment. An Anthropic-side cron fires the
+# coordinator on a cadence (replaces dCern's in-app APScheduler for the fleet).
+# Fill in the coordinator agent ID + environment ID, then create it (PROD.md has
+# the REST call; `ant beta:deployments` may not exist in your CLI version).
+name: dCern scan
+agent: REPLACE_WITH_COORDINATOR_AGENT_ID
+environment_id: REPLACE_WITH_ENV_ID
+initial_events:
+  - type: user.message
+    content:
+      - type: text
+        text: |
+          Scan every business axis for decision-worthy signals. Raise a 1-3-1
+          decision only when at least two distinct axes corroborate.
+schedule:
+  type: cron
+  expression: "0 * * * *"      # hourly — tune to your cost/latency budget
+  timezone: America/New_York
