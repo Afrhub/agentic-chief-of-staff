@@ -1,0 +1,12 @@
+# dCern agent environment (Phase 1 = cloud, Anthropic-hosted container).
+#   ant beta:environments create < backend/agents/environment.yaml --transform id -r
+# then set DCERN_ENV_ID on the dCern service.
+#
+# Phase 3 (data-residency prod): switch config.type to "self_hosted" so tool
+# execution + data run on the founder's own infrastructure — the agent loop
+# stays on Anthropic's side. See managed-agents self-hosted-sandboxes docs.
+name: dcern-cloud
+config:
+  type: cloud
+  networking:
+    type: unrestricted   # tighten to 'limited' + allowed_hosts once axis tools are fixed

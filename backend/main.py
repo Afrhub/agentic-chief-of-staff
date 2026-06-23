@@ -824,6 +824,55 @@ def verify_alert(founder_id: str, alert_id: str, body: VerifyRequest, db: Sessio
     return {"status": "verified", "impact": d.impact}
 
 
+# ---------------------------------------------------------------------------
+# Phase 1 — per-axis Managed Agent (Money). Safe by default: no-ops until the
+# agent + environment IDs are configured. See backend/agents/README.md.
+# ---------------------------------------------------------------------------
+
+
+def _money_context(founder_id: str, db: Session) -> str:
+    parts = ["Money-axis snapshot for the founder:"]
+    m = db.query(Metric).filter(
+        Metric.founder_id == founder_id, Metric.name.ilike("%mrr%")
+    ).first()
+    if m:
+        vals = [r.value for r in db.query(MetricReading).filter(
+            MetricReading.metric_id == m.id
+        ).order_by(MetricReading.recorded_at).all()]
+        parts.append(f"MRR target={m.target} {m.unit or ''}; recent actuals (oldest->newest)={vals}.")
+    else:
+        parts.append("No MRR metric configured yet.")
+    return "\n".join(parts)
+
+
+@app.post("/founders/{founder_id}/agents/money/run")
+def run_money_agent(founder_id: str, db: Session = Depends(get_db)):
+    """Trigger the Money axis-agent (Managed Agent) and ingest its finding.
+    No-ops with a clear message until the agent + environment IDs are set."""
+    agent_id, env_id = os.getenv("MONEY_AGENT_ID"), os.getenv("DCERN_ENV_ID")
+    if not (agent_id and env_id and os.getenv("ANTHROPIC_API_KEY")):
+        return {"status": "not_configured",
+                "detail": "Set MONEY_AGENT_ID, DCERN_ENV_ID and ANTHROPIC_API_KEY — see backend/agents/README.md"}
+    try:
+        from agents.managed_agents import run_axis_agent
+        finding = run_axis_agent(agent_id, env_id, _money_context(founder_id, db))
+    except Exception as e:
+        logger.error(f"money agent run failed: {e}")
+        raise HTTPException(status_code=502, detail="Money agent run failed")
+
+    result = {"finding": finding}
+    if finding.get("has_signal"):
+        sig = AlertSignal(
+            type=finding.get("type", "revenue_anomaly"),
+            confidence=float(finding.get("confidence", 0.8)),
+            timestamp=datetime.utcnow(),
+            data=finding.get("data", {}),
+        )
+        alert = process_signals(founder_id, [sig], db)
+        result["alert_status"] = "surfaced" if alert else "suppressed (one signal — corroboration is Phase 2)"
+    return result
+
+
 @app.get("/founders/{founder_id}/integrations")
 def list_integrations(founder_id: str, db: Session = Depends(get_db)):
     """List connected integrations + sync status (for the Connect UI)."""
