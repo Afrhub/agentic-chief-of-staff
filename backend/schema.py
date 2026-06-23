@@ -1,11 +1,27 @@
-from sqlalchemy import Column, String, DateTime, JSON, Float, Boolean, Integer, Text, ForeignKey, create_engine
+from sqlalchemy import Column, String, DateTime, JSON, Float, Boolean, Integer, Text, ForeignKey, create_engine, TypeDecorator
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
 from datetime import datetime
 import uuid
 
+from crypto_box import encrypt_secret, decrypt_secret
+
 Base = declarative_base()
+
+
+class EncryptedString(TypeDecorator):
+    """Transparently encrypts on write / decrypts on read (see crypto_box). Stored
+    as text; a no-op without DCERN_SECRET_KEY, so it's backward-compatible with rows
+    written before the key existed."""
+    impl = Text
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        return encrypt_secret(value)
+
+    def process_result_value(self, value, dialect):
+        return decrypt_secret(value)
 
 
 class Founder(Base):
@@ -109,7 +125,7 @@ class IntegrationState(Base):
 
     # Integration info
     service = Column(String, nullable=False)  # stripe, slack, email, calendar, salesforce
-    access_token = Column(String, nullable=False)
+    access_token = Column(EncryptedString, nullable=False)  # encrypted at rest (DCERN_SECRET_KEY)
     refresh_token = Column(String, nullable=True)
 
     # Sync state

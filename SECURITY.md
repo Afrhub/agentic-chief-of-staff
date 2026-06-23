@@ -29,8 +29,8 @@ Verified: `backend/live_run.py` 48/48 (incl. headers present, oversized input re
 
 | Priority | OWASP | Item | Why / how |
 |----------|-------|------|-----------|
-| **P1** | A02 | **Encrypt `IntegrationState` secrets at rest** | The server-side adapter tokens (Stripe REST key, Slack token, etc.) are stored plaintext. Encrypt with Fernet under a `DCERN_SECRET_KEY` env (never in code); decrypt only at use. (Agent MCP creds are already vault-side and unaffected.) |
-| **P1** | A05 | **Content-Security-Policy on the frontend** | Needs `INLINE_RUNTIME_CHUNK=false` in the Netlify build + `script-src 'self'`, then a deploy-preview to confirm no white-screen. Held back here precisely to avoid breaking the live site unverified. |
+| ✅ done | A02 | **Encrypt `IntegrationState` secrets at rest** | `crypto_box.py` (Fernet under `DCERN_SECRET_KEY`); `schema.EncryptedString` encrypts on write / decrypts on read transparently. `enc:` prefix keeps legacy-plaintext rows readable; no-op without the key. **Set `DCERN_SECRET_KEY` on Render to activate.** Verified: DB stores ciphertext, ORM decrypts. |
+| ✅ done | A05 | **Content-Security-Policy (frontend)** | Strict CSP in `frontend/public/_headers`: `script-src 'self'` + sha256 of the inline theme bootstrap (no `unsafe-inline` for scripts); `INLINE_RUNTIME_CHUNK=false` removes the runtime inline script. Verified in-browser: app mounts, theme applies, zero violations. |
 | P2 | A07 | **Account lockout** | Rate limiting throttles brute force; add per-account lockout after N failures for defence in depth. |
 | P2 | A06 | **Dependency scanning in CI** | `pip-audit` (backend) + `npm audit --audit-level=high` (frontend) on each push. |
 | P2 | A09 | **Audit logging** | Structured log of auth events + decisions (no tokens/PII) to a tamper-evident sink. |

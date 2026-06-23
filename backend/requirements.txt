@@ -21,3 +21,4 @@ google-auth-httplib2==0.2.0
 google-api-python-client==2.102.0
 httpx==0.25.2
 aiohttp==3.9.1
+cryptography>=42.0  # Fernet — encrypts IntegrationState secrets at rest (crypto_box.py)

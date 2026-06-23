@@ -6,6 +6,9 @@
 
 [build.environment]
   CI = "false"   # don't treat lint warnings as hard errors in CI build
+  # Don't inline the webpack runtime as an inline <script>, so the CSP can use a
+  # strict script-src 'self' (no 'unsafe-inline') — see frontend/public/_headers.
+  INLINE_RUNTIME_CHUNK = "false"
   # Frontend calls the backend at this URL. Default matches the render.yaml
   # service name; if Render assigns a different host, override REACT_APP_API_URL
   # in Netlify → Site configuration → Environment variables, then redeploy.
