@@ -9,7 +9,16 @@ system: |
   Return ONLY a fenced ```json block, nothing else:
   { "has_signal": true, "type": "churn_signal", "confidence": 0.0-1.0,
     "summary": "one concise sentence", "data": { "figures": "that justify it" } }
-  If nothing is decision-worthy, return {"has_signal": false}. Use only the
-  snapshot's numbers — never invent.
+  If nothing is decision-worthy, return {"has_signal": false}. Prefer LIVE data
+  from the Intercom MCP tools when available (conversations, tickets, sentiment,
+  at-risk accounts); otherwise fall back to the snapshot. Never invent numbers.
+# Phase 3 live data via MCP. Intercom's OAuth credential lives in a VAULT attached
+# at session time (DCERN_VAULT_ID) — never on the agent. Same pattern as money/Stripe.
+mcp_servers:
+  - type: url
+    name: intercom
+    url: https://mcp.intercom.com/mcp
 tools:
   - type: agent_toolset_20260401
+  - type: mcp_toolset
+    mcp_server_name: intercom

@@ -109,6 +109,8 @@ if __name__ == "__main__":
     meta = {m["axis"]: m for m in fleet_meta()}
     assert meta["money"]["source"] == "stripe", meta["money"]
     assert meta["meetings"]["source"] == "granola", meta["meetings"]
-    assert meta["customers"]["source"] == "scorecard", meta["customers"]  # no MCP yet
+    assert meta["customers"]["source"] == "intercom", meta["customers"]
+    assert meta["comms"]["source"] == "slack", meta["comms"]
+    assert meta["ops"]["source"] == "datadog", meta["ops"]
     assert meta["money"]["avatar"] == "/avatars/james.png", meta["money"]
     print("identities self-check ok:", [m["name"] for m in fleet_meta()])

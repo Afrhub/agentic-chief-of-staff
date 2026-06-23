@@ -361,10 +361,10 @@ each agent's system prompt at creation (`create_agents.py`).
 | Agent | Axis | Role | Model | Live source |
 |-------|------|------|-------|-------------|
 | **James** | money | Finance Director | Haiku 4.5 | Stripe (MCP, wired) |
-| **Sofia** | customers | Head of Customer Success | Haiku 4.5 | Intercom (planned) |
-| **Marcus** | comms | Chief of Staff / gatekeeper | Sonnet 4.6 | Slack/Gmail (planned) |
+| **Sofia** | customers | Head of Customer Success | Haiku 4.5 | Intercom (MCP, wired) |
+| **Marcus** | comms | Chief of Staff / gatekeeper | Sonnet 4.6 | Slack (MCP, wired) |
 | **Priya** | meetings | Executive Assistant | Sonnet 4.6 | Granola (MCP, wired) |
-| **David** | ops | Head of Operations | Haiku 4.5 | Datadog (planned) |
+| **David** | ops | Head of Operations | Haiku 4.5 | Datadog (MCP, wired) |
 | **dCern** | — | Chief of Staff (coordinator) | Opus 4.8 | synthesises the team |
 
 **Mixed-model by design:** Haiku for the metric/number axes (cheap, high-frequency),
@@ -405,8 +405,8 @@ A connected source can baseline these from history later (planned).
 
 ### Status
 - ✅ Fleet live end-to-end: 5 agents, corroboration gate, onboarding calibration, Team view.
-- ✅ money → Stripe MCP and meetings → Granola MCP wired (need a vault attached to go live).
-- ⏳ customers/comms/ops live sources (Intercom/Slack/Datadog) — same pattern, not yet wired.
+- ✅ All five axes wired to their MCP source — Stripe, Intercom, Slack, Granola, Datadog.
+  Attach a vault (`DCERN_VAULT_ID`) holding those connectors to flip them snapshot → live.
 - ⏳ data-baselined calibration; 24/7 scheduled deployment (coordinator agent + cron).
 
 ---
