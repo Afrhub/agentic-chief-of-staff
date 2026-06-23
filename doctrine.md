@@ -374,12 +374,32 @@ dumbing down the alert. (Retired model IDs were corrected to `claude-sonnet-4-6`
 `claude-haiku-4-5`; agents on `claude-opus-4-8`.)
 
 ### Live data + credentials
-Each agent declares its connector's **MCP server** in its YAML (e.g. `mcp.stripe.com`,
-`mcp.granola.ai/mcp`). The OAuth credential lives in an Anthropic **vault** attached at
-session time (`DCERN_VAULT_ID`) — never on the agent, never in our DB. Agents prefer
-live data and **fall back to the scorecard snapshot** when no vault/source is wired
-(graceful degradation). Independent sources are what make cross-axis corroboration
-*mean* something — not one number reframed five ways.
+Each agent declares its connector's **hosted MCP server** in its YAML and adds an
+`mcp_toolset`. The OAuth credential lives in an Anthropic **vault** attached at session
+time (`DCERN_VAULT_ID`) — never on the agent, never in our DB. Agents prefer live data
+and **fall back to the scorecard snapshot** when no vault/source is wired (graceful
+degradation). Independent sources are what make cross-axis corroboration *mean*
+something — not one number reframed five ways.
+
+Wired MCP endpoints (verified against each vendor's docs, 2026-06-23):
+
+| Axis | Connector | MCP endpoint |
+|------|-----------|--------------|
+| money | Stripe | `https://mcp.stripe.com` |
+| customers | Intercom | `https://mcp.intercom.com/mcp` |
+| comms | Slack | `https://mcp.slack.com/mcp` |
+| meetings | Granola | `https://mcp.granola.ai/mcp` |
+| ops | Datadog | `https://mcp.datadoghq.com/api/unstable/mcp-server/mcp` (EU: `mcp.datadoghq.eu`) |
+
+**Activation (snapshot → live), per deployment:**
+1. Re-run `create_agents.py` so each agent is (re)created *with* its MCP server; set the
+   new `<AXIS>_AGENT_ID`s on the service (Render env vars).
+2. Attach a vault (`DCERN_VAULT_ID`) holding the OAuth connectors for the services you
+   want live. Incremental — connect a subset first; unconnected axes snapshot-fallback.
+
+The **"· live" badge in the Team view reflects the wiring, not a verified connection** —
+an axis only pulls live once its connector is authenticated in the attached vault.
+Comms (Marcus) can take further `mcp_servers` for Gmail / Google Calendar alongside Slack.
 
 ### Corroboration gate (refined 2026-06-23)
 A card surfaces only when **≥2 distinct axes** agree **and** confidence clears the bar.
