@@ -6,7 +6,7 @@ import '../styles/chat.css';
 
 // Email + password onboarding. On success stores {token, founder_id} and hands
 // the founder id up to App, which swaps in the live dashboard.
-const Login: React.FC<{ onAuthed: (founderId: string) => void }> = ({ onAuthed }) => {
+const Login: React.FC<{ onAuthed: (founderId: string, isNew?: boolean) => void }> = ({ onAuthed }) => {
   const [mode, setMode] = useState<'signup' | 'login'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,7 +30,8 @@ const Login: React.FC<{ onAuthed: (founderId: string) => void }> = ({ onAuthed }
       if (!r.ok) throw new Error(data.detail || 'Something went wrong.');
       localStorage.setItem('token', data.token);
       localStorage.setItem('founder_id', data.founder_id);
-      onAuthed(data.founder_id);
+      if (mode === 'signup') localStorage.setItem('dcern_onboarding', 'pending');
+      onAuthed(data.founder_id, mode === 'signup');
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Something went wrong.');
     } finally {

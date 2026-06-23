@@ -769,12 +769,20 @@ def _calibrate(founder_id: str, pack_id: str, db: Session) -> list:
 
 
 @app.post("/founders/{founder_id}/scorecard/calibrate")
-def calibrate_scorecard(founder_id: str, db: Session = Depends(get_db)):
+def calibrate_scorecard(founder_id: str, reset: bool = False, db: Session = Depends(get_db)):
     """Re-run onboarding calibration: set each axis's targets from the founder's
-    pack. Idempotent — only adds metrics not already present (existing targets,
-    edited or not, are left alone)."""
+    pack. Idempotent — only adds metrics not already present. With reset=true
+    (industry re-pick), first drops the founder's *untouched* default metrics (no
+    readings logged) so the new pack's targets replace them; metrics the founder
+    has actually used (have readings) are kept."""
     f = db.query(Founder).filter(Founder.id == founder_id).first()
     pack_id = (f.pack if f else None) or get_pack(None).get("id")
+    if reset:
+        for m in db.query(Metric).filter(Metric.founder_id == founder_id).all():
+            used = db.query(MetricReading).filter(MetricReading.metric_id == m.id).first()
+            if not used:
+                db.delete(m)
+        db.commit()
     created = _calibrate(founder_id, pack_id, db)
     return {"pack": pack_id, "created": created}
 

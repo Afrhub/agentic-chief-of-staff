@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
+import Onboarding from './pages/Onboarding';
 import { DEMO_FOUNDER_ID } from './demo';
 import './App.css';
 
 const App: React.FC = () => {
   const [founderId, setFounderId] = useState<string | null>(null);
   const [demo, setDemo] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -23,7 +25,11 @@ const App: React.FC = () => {
       // Live: require a session from login (token + id stored by Login).
       const token = localStorage.getItem('token');
       const fid = localStorage.getItem('founder_id');
-      if (token && fid) setFounderId(fid);
+      if (token && fid) {
+        setFounderId(fid);
+        // resume onboarding if a fresh signup didn't finish it (survives refresh)
+        if (localStorage.getItem('dcern_onboarding') === 'pending') setNeedsOnboarding(true);
+      }
     }
     setReady(true);
   }, []);
@@ -34,8 +40,23 @@ const App: React.FC = () => {
     setFounderId(null);
   };
 
+  const handleAuthed = (fid: string, isNew?: boolean) => {
+    setFounderId(fid);
+    if (isNew) setNeedsOnboarding(true);
+  };
+
   if (!ready) return <div className="loading">Loading…</div>;
-  if (!founderId) return <Login onAuthed={setFounderId} />;
+  if (!founderId) return <Login onAuthed={handleAuthed} />;
+  if (needsOnboarding && !demo)
+    return (
+      <Onboarding
+        founderId={founderId}
+        onDone={() => {
+          localStorage.setItem('dcern_onboarding', 'done');
+          setNeedsOnboarding(false);
+        }}
+      />
+    );
 
   return (
     <Router>

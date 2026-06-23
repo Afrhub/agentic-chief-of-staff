@@ -1,0 +1,105 @@
+.onb { width: min(560px, calc(100% - 28px)); }
+
+.onb__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+.onb__steps { display: flex; gap: 7px; }
+.onb__dot {
+  width: 22px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--hair-strong);
+  transition: background 0.3s var(--ease);
+}
+.onb__dot.is-on { background: var(--violet); }
+
+.onb__body { min-height: 232px; }
+.onb__title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 6px 0 10px;
+  color: var(--text);
+}
+.onb__lead { color: var(--text-dim); font-size: 0.92rem; line-height: 1.55; margin: 0 0 18px; }
+.onb__muted { color: var(--text-faint); font-size: 0.86rem; }
+
+/* Step 1 — industry picker */
+.onb__packs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.onb__pack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--hair-strong);
+  background: var(--chip-bg);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.onb__pack:hover { transform: translateY(-2px); }
+.onb__pack.is-sel { border-color: var(--violet); background: color-mix(in oklab, var(--violet) 12%, transparent); }
+.onb__pack-name { color: var(--text); font-weight: 650; font-size: 0.96rem; }
+.onb__pack-id { color: var(--text-faint); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* Step 2 — targets */
+.onb__metrics { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.onb__metric {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--hair);
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+.onb__metric:last-child { border-bottom: none; }
+.onb__metric-t { color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; }
+.onb__metric-t em { color: var(--text-faint); font-style: normal; }
+
+/* Step 3 — sources */
+.onb__sources { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.onb__source {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--hair);
+  background: var(--chip-bg);
+}
+.onb__source-name { color: var(--text); font-weight: 600; font-size: 0.9rem; text-transform: capitalize; }
+.onb__source-axis { grid-column: 1; color: var(--text-faint); font-size: 0.76rem; }
+.onb__source-status {
+  grid-column: 2; grid-row: 1 / span 2;
+  color: var(--text-faint); font-size: 0.74rem;
+  padding: 3px 9px; border-radius: 99px; border: 1px solid var(--hair-strong); background: var(--shell, transparent);
+}
+
+/* Step 4 — team */
+.onb__team { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 14px; }
+.onb__member { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; }
+.onb__avatar {
+  position: relative; overflow: hidden;
+  width: 52px; height: 52px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--violet); color: #fff;
+  font-family: var(--font-display); font-weight: 700;
+}
+.onb__avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.onb__member-name { color: var(--text); font-weight: 600; font-size: 0.84rem; }
+.onb__member-role { color: var(--text-faint); font-size: 0.7rem; line-height: 1.2; }
+
+/* nav */
+.onb__nav { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; gap: 12px; }
+.onb__back {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-family: var(--font-body); font-size: 0.88rem; padding: 8px 4px;
+}
+.onb__back:hover { color: var(--text); }

@@ -413,11 +413,16 @@ extras no longer dilute it — and the bar **drops 0.05 per axis beyond the seco
 signals still suppress. Implemented in `coordinator.analyze_signals`. This refines (not
 replaces) edge-case #2's "≥2 independent signals" rule.
 
-### Onboarding calibration
-At signup the founder's scorecard is **auto-seeded with their pack's default targets**
-(`packs/<id>.yaml` → `metrics:`) — the per-axis "business parameters" each agent judges
-against. Idempotent; re-runnable via `POST /scorecard/calibrate`; fully founder-editable.
-A connected source can baseline these from history later (planned).
+### Onboarding (wizard + calibration)
+New signups go through a **5-step wizard** (Welcome → Industry → Targets → Sources → Team;
+`frontend/src/pages/Onboarding.tsx`): pick an industry (sets the pack + agent vocabulary),
+review the **auto-seeded scorecard targets** (`packs/<id>.yaml` → `metrics:`), see which data
+sources to connect, and meet the agent team — then land on the dashboard. Calibration is
+idempotent (`POST /scorecard/calibrate`); `reset=true` swaps the *untouched* default targets
+when the founder changes industry (metrics with logged readings are kept). Targets are the
+per-axis "business parameters" each agent judges against; founder-editable; a connected source
+can baseline them from history later (planned). Returning logins skip the wizard (signup-only,
+tracked client-side).
 
 ### Team view (dashboard)
 The **Team** tab renders the fleet from `GET /agents/fleet`. Each agent is an **expandable
