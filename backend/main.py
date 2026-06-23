@@ -896,11 +896,17 @@ def run_axis_endpoint(founder_id: str, axis: str, db: Session = Depends(get_db))
 def run_agent_fleet(founder_id: str, db: Session = Depends(get_db)):
     """Run every configured axis agent, then corroborate their findings via the
     ≥2-distinct rule — the fleet path that produces surfaced alerts."""
-    findings, signals = [], []
-    for axis in _AXIS_AGENTS:
+    configured = [ax for ax in _AXIS_AGENTS if os.getenv(_AXIS_AGENTS[ax])]
+    if not (configured and os.getenv("DCERN_ENV_ID") and os.getenv("ANTHROPIC_API_KEY")):
+        return {"status": "not_configured",
+                "detail": "No axis agents configured — see backend/agents/README.md"}
+
+    findings, signals, errors = [], [], {}
+    for axis in configured:
         try:
             f = _run_axis(founder_id, axis, db)
         except Exception as e:
+            errors[axis] = str(e)[:300]
             logger.error(f"{axis} agent run failed: {e}")
             continue
         if f is None:
@@ -910,12 +916,16 @@ def run_agent_fleet(founder_id: str, db: Session = Depends(get_db)):
             signals.append(AlertSignal(
                 type=f.get("type", axis), confidence=float(f.get("confidence", 0.8)),
                 timestamp=datetime.utcnow(), data=f.get("data", {})))
+
     if not findings:
-        return {"status": "not_configured",
-                "detail": "No axis agents configured — see backend/agents/README.md"}
+        # Configured, but every run errored — surface WHY (don't mislabel as unconfigured).
+        return {"status": "no_findings", "configured": configured, "errors": errors,
+                "detail": "Axis agents are configured but none returned a finding — see "
+                          "'errors' (commonly low Anthropic balance or rate limits)."}
+
     alert = process_signals(founder_id, signals, db) if signals else None
     return {
-        "findings": findings, "signals": len(signals),
+        "findings": findings, "signals": len(signals), "errors": errors,
         "alert_status": "surfaced" if alert else "suppressed",
         "alert_id": alert.id if alert else None,
     }
