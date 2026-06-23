@@ -50,12 +50,12 @@
   position: sticky;
   top: 18px;
   z-index: 40;
-  width: min(1040px, calc(100% - 40px));
+  width: min(1240px, calc(100% - 28px));
   margin: 18px auto 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   padding: 12px 12px 12px 22px;
   border-radius: 999px;
   background: var(--island-bg);
@@ -76,7 +76,7 @@
   font-size: 1.02rem;
   letter-spacing: -0.01em;
 }
-.island__right { display: flex; align-items: center; gap: 10px; }
+.island__right { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 
 .demo-pill {
   display: inline-flex;
@@ -93,10 +93,10 @@
 }
 
 .status-pill {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 8px 14px;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 11px;
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--text-dim);
   background: var(--chip-bg);
   border: 1px solid var(--hair);
@@ -113,11 +113,11 @@
 }
 
 .ghost-pill {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 9px 9px 9px 18px;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 8px 8px 14px;
   border-radius: 999px;
   font-family: var(--font-body);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--text);
   background: var(--chip-bg-strong);
@@ -129,7 +129,7 @@
 .ghost-pill:active { transform: scale(0.97); }
 .ghost-pill__icon {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; border-radius: 50%;
+  width: 22px; height: 22px; border-radius: 50%;
   background: var(--chip-hover);
   font-size: 0.85rem;
   transition: transform 0.5s var(--ease);
