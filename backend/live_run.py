@@ -167,5 +167,21 @@ with TestClient(main.app) as c:
     check("unknown axis -> 404", c.post(f"/founders/{fid}/agents/bogus/run").status_code == 404)
     check("deployment sync gated when unconfigured", c.post(f"/founders/{fid}/agents/deployments/sync").json().get("status") == "not_configured")
 
+    print("==> 16. Corroboration gate — breadth beats dilution (top-2 + breadth bonus)")
+    # 3 distinct signals, two strong + one moderate. Old AVG=(0.85+0.85+0.5)/3=0.73 -> suppressed.
+    # New: top-2 = 0.85, 3 axes -> threshold 0.75 -> SURFACES.
+    r = c.post(f"/founders/{fid}/alerts", json={"signals": [
+        {"type": "revenue_anomaly", "confidence": 0.85, "data": {}},
+        {"type": "churn_signal", "confidence": 0.85, "data": {}},
+        {"type": "team_conflict", "confidence": 0.5, "data": {}},
+    ]})
+    check("breadth + strong top-2 -> surfaced (no dilution)", r.json().get("status") == "surfaced")
+    # 2 distinct but both moderate -> top-2 = 0.625 < 0.8 -> still suppressed.
+    r = c.post(f"/founders/{fid}/alerts", json={"signals": [
+        {"type": "revenue_anomaly", "confidence": 0.6, "data": {}},
+        {"type": "churn_signal", "confidence": 0.65, "data": {}},
+    ]})
+    check("two moderate signals -> still suppressed", r.json().get("status") == "suppressed")
+
 print(f"\n{'ALL ' + str(len(passed)) + ' CHECKS PASSED' if not failed else str(len(failed)) + ' FAILED: ' + str(failed)}")
 raise SystemExit(1 if failed else 0)

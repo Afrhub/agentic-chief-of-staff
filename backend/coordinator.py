@@ -109,11 +109,22 @@ class CoordinatorAgent:
             )
             return state
 
-        confidence = min(0.95, sum(s.confidence for s in signals) / len(signals))
+        # Judge corroboration on the strongest signal per DISTINCT type (so moderate
+        # extras don't dilute and wrongly suppress), and reward breadth: each axis
+        # beyond the 2nd lowers the bar a little, down to a 0.65 floor.
+        best_per_type = {}
+        for s in signals:
+            best_per_type[s.type] = max(best_per_type.get(s.type, 0.0), s.confidence)
+        top = sorted(best_per_type.values(), reverse=True)[:2]
+        confidence = min(0.95, sum(top) / len(top))
+        threshold = max(0.65, 0.8 - 0.05 * (unique_types - 2))
 
-        if confidence < 0.8:
+        if confidence < threshold:
             state["should_surface_alert"] = False
-            logger.info(f"Confidence {confidence:.2f} < 0.8, suppressing alert")
+            logger.info(
+                f"top-2 confidence {confidence:.2f} < {threshold:.2f} "
+                f"across {unique_types} axes; suppressing"
+            )
             return state
 
         state["confidence_score"] = confidence
