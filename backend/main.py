@@ -830,47 +830,91 @@ def verify_alert(founder_id: str, alert_id: str, body: VerifyRequest, db: Sessio
 # ---------------------------------------------------------------------------
 
 
-def _money_context(founder_id: str, db: Session) -> str:
-    parts = ["Money-axis snapshot for the founder:"]
-    m = db.query(Metric).filter(
-        Metric.founder_id == founder_id, Metric.name.ilike("%mrr%")
-    ).first()
-    if m:
-        vals = [r.value for r in db.query(MetricReading).filter(
+_AXIS_AGENTS = {
+    "money": "MONEY_AGENT_ID",
+    "customers": "CUSTOMERS_AGENT_ID",
+    "comms": "COMMS_AGENT_ID",
+    "meetings": "MEETINGS_AGENT_ID",
+    "ops": "OPS_AGENT_ID",
+}
+
+
+def _axis_context(founder_id: str, axis: str, db: Session) -> str:
+    """Snapshot of the founder's state for an axis agent to analyze (scorecard +
+    recent decisions). Phase 3 gives each agent its own live MCP data source."""
+    lines = [f"Axis: {axis}. Decide if there is a decision-worthy {axis} signal right now.", "Scorecard:"]
+    for m in db.query(Metric).filter(Metric.founder_id == founder_id).all():
+        last = db.query(MetricReading).filter(
             MetricReading.metric_id == m.id
-        ).order_by(MetricReading.recorded_at).all()]
-        parts.append(f"MRR target={m.target} {m.unit or ''}; recent actuals (oldest->newest)={vals}.")
-    else:
-        parts.append("No MRR metric configured yet.")
-    return "\n".join(parts)
+        ).order_by(MetricReading.recorded_at.desc()).first()
+        lines.append(f"- {m.name}: {last.value if last else 'n/a'} (target {m.target}{m.unit or ''}, better {m.direction})")
+    recent = db.query(Alert).filter(
+        Alert.founder_id == founder_id
+    ).order_by(Alert.triggered_at.desc()).limit(5).all()
+    if recent:
+        lines.append("Recent decisions: " + "; ".join((a.title or "")[:80] for a in recent))
+    return "\n".join(lines)
 
 
-@app.post("/founders/{founder_id}/agents/money/run")
-def run_money_agent(founder_id: str, db: Session = Depends(get_db)):
-    """Trigger the Money axis-agent (Managed Agent) and ingest its finding.
-    No-ops with a clear message until the agent + environment IDs are set."""
-    agent_id, env_id = os.getenv("MONEY_AGENT_ID"), os.getenv("DCERN_ENV_ID")
-    if not (agent_id and env_id and os.getenv("ANTHROPIC_API_KEY")):
-        return {"status": "not_configured",
-                "detail": "Set MONEY_AGENT_ID, DCERN_ENV_ID and ANTHROPIC_API_KEY — see backend/agents/README.md"}
+def _run_axis(founder_id: str, axis: str, db: Session):
+    """Run one axis agent → its finding dict, or None if that axis isn't configured."""
+    agent_id = os.getenv(_AXIS_AGENTS.get(axis, ""))
+    if not (agent_id and os.getenv("DCERN_ENV_ID") and os.getenv("ANTHROPIC_API_KEY")):
+        return None
+    from agents.managed_agents import run_axis_agent
+    return run_axis_agent(agent_id, os.environ["DCERN_ENV_ID"], _axis_context(founder_id, axis, db))
+
+
+@app.post("/founders/{founder_id}/agents/{axis}/run")
+def run_axis_endpoint(founder_id: str, axis: str, db: Session = Depends(get_db)):
+    """Run a single axis agent and ingest its finding. A lone signal is correctly
+    suppressed — surfacing needs ≥2 axes; use POST /agents/run for the fleet."""
+    if axis not in _AXIS_AGENTS:
+        raise HTTPException(status_code=404, detail=f"Unknown axis '{axis}'")
     try:
-        from agents.managed_agents import run_axis_agent
-        finding = run_axis_agent(agent_id, env_id, _money_context(founder_id, db))
+        finding = _run_axis(founder_id, axis, db)
     except Exception as e:
-        logger.error(f"money agent run failed: {e}")
-        raise HTTPException(status_code=502, detail="Money agent run failed")
-
-    result = {"finding": finding}
+        logger.error(f"{axis} agent run failed: {e}")
+        raise HTTPException(status_code=502, detail=f"{axis} agent run failed")
+    if finding is None:
+        return {"status": "not_configured",
+                "detail": f"Set {_AXIS_AGENTS[axis]}, DCERN_ENV_ID and ANTHROPIC_API_KEY — see backend/agents/README.md"}
+    result = {"axis": axis, "finding": finding}
     if finding.get("has_signal"):
-        sig = AlertSignal(
-            type=finding.get("type", "revenue_anomaly"),
-            confidence=float(finding.get("confidence", 0.8)),
-            timestamp=datetime.utcnow(),
-            data=finding.get("data", {}),
-        )
-        alert = process_signals(founder_id, [sig], db)
-        result["alert_status"] = "surfaced" if alert else "suppressed (one signal — corroboration is Phase 2)"
+        alert = process_signals(founder_id, [AlertSignal(
+            type=finding.get("type", axis), confidence=float(finding.get("confidence", 0.8)),
+            timestamp=datetime.utcnow(), data=finding.get("data", {}))], db)
+        result["alert_status"] = "surfaced" if alert else "suppressed (one signal — corroboration needs ≥2 axes)"
     return result
+
+
+@app.post("/founders/{founder_id}/agents/run")
+def run_agent_fleet(founder_id: str, db: Session = Depends(get_db)):
+    """Run every configured axis agent, then corroborate their findings via the
+    ≥2-distinct rule — the fleet path that produces surfaced alerts."""
+    findings, signals = [], []
+    for axis in _AXIS_AGENTS:
+        try:
+            f = _run_axis(founder_id, axis, db)
+        except Exception as e:
+            logger.error(f"{axis} agent run failed: {e}")
+            continue
+        if f is None:
+            continue
+        findings.append({"axis": axis, **f})
+        if f.get("has_signal"):
+            signals.append(AlertSignal(
+                type=f.get("type", axis), confidence=float(f.get("confidence", 0.8)),
+                timestamp=datetime.utcnow(), data=f.get("data", {})))
+    if not findings:
+        return {"status": "not_configured",
+                "detail": "No axis agents configured — see backend/agents/README.md"}
+    alert = process_signals(founder_id, signals, db) if signals else None
+    return {
+        "findings": findings, "signals": len(signals),
+        "alert_status": "surfaced" if alert else "suppressed",
+        "alert_id": alert.id if alert else None,
+    }
 
 
 @app.get("/founders/{founder_id}/integrations")

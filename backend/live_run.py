@@ -161,9 +161,10 @@ with TestClient(main.app) as c:
     check("verified alert moves to 'done'", any(card["id"] == aid for card in b["done"]))
     check("done card carries impact", next(card for card in b["done"] if card["id"] == aid)["impact"] == "positive")
 
-    print("==> 15. Phase-1 Money agent endpoint — safe no-op until agent IDs configured")
-    r = c.post(f"/founders/{fid}/agents/money/run")
-    check("money agent endpoint gated when unconfigured", r.json().get("status") == "not_configured")
+    print("==> 15. Phase-2 axis-agent fleet — safe no-ops / validation until configured")
+    check("single axis agent gated when unconfigured", c.post(f"/founders/{fid}/agents/money/run").json().get("status") == "not_configured")
+    check("agent fleet gated when unconfigured", c.post(f"/founders/{fid}/agents/run").json().get("status") == "not_configured")
+    check("unknown axis -> 404", c.post(f"/founders/{fid}/agents/bogus/run").status_code == 404)
 
 print(f"\n{'ALL ' + str(len(passed)) + ' CHECKS PASSED' if not failed else str(len(failed)) + ' FAILED: ' + str(failed)}")
 raise SystemExit(1 if failed else 0)
