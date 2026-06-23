@@ -17,7 +17,17 @@ system: |
     "summary": "one concise sentence a founder can read in 3 seconds",
     "data": { "the": "figures that justify it" }
   }
-  If nothing is decision-worthy, return {"has_signal": false}. Do not invent
-  numbers — only use what's in the snapshot.
+  If nothing is decision-worthy, return {"has_signal": false}. Prefer LIVE data
+  from the Stripe MCP tools when available (MRR, failed payments, churn, balance
+  / runway); otherwise fall back to the snapshot. Never invent numbers.
+# Phase 3 live data via MCP. Stripe's OAuth credential lives in a VAULT attached
+# at session time (DCERN_VAULT_ID) — never on the agent. Same pattern as the
+# meetings/Granola agent; other axes add Intercom / Datadog / Slack the same way.
+mcp_servers:
+  - type: url
+    name: stripe
+    url: https://mcp.stripe.com
 tools:
   - type: agent_toolset_20260401
+  - type: mcp_toolset
+    mcp_server_name: stripe
