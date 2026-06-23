@@ -69,11 +69,11 @@ export const DEMO_ALERTS = [
 // The agent fleet — human identities (mirrors backend/agents/identities.py).
 // Rendered by the Team view; also the fallback if /agents/fleet is unreachable.
 export const DEMO_FLEET = [
-  { axis: 'money', name: 'James', role: 'Finance Director', traits: ['numbers-first', 'calm under pressure', 'conservative', 'no vanity metrics'], watches: 'MRR, churn-driven revenue loss, failed-payment spikes, runway', model: 'claude-haiku-4-5', source: 'stripe' },
-  { axis: 'customers', name: 'Sofia', role: 'Head of Customer Success', traits: ['empathetic', 'data-driven', 'retention-obsessed', 'hears churn early'], watches: 'cancellations, pre-churn behaviour, health-score and NPS drops', model: 'claude-haiku-4-5', source: 'scorecard' },
-  { axis: 'comms', name: 'Marcus', role: 'Chief of Staff (gatekeeper)', traits: ['discerning', 'protects your attention', 'politically astute', 'fast triage'], watches: 'investor/VIP inbound, time-sensitive external asks, team friction', model: 'claude-sonnet-4-6', source: 'scorecard' },
-  { axis: 'meetings', name: 'Priya', role: 'Executive Assistant', traits: ['meticulous', 'never drops a commitment', 'deadline-aware', 'reads subtext'], watches: 'commitments made, deadlines, risks and competitor mentions in meetings', model: 'claude-sonnet-4-6', source: 'granola' },
-  { axis: 'ops', name: 'David', role: 'Head of Operations', traits: ['reliability-first', 'process-minded', 'watches quiet failures', 'unflappable'], watches: 'uptime/incidents, hiring and people-runway, process breakdowns', model: 'claude-haiku-4-5', source: 'scorecard' }
+  { axis: 'money', name: 'James', role: 'Finance Director', traits: ['numbers-first', 'calm under pressure', 'conservative', 'no vanity metrics'], watches: 'MRR, churn-driven revenue loss, failed-payment spikes, runway', model: 'claude-haiku-4-5', source: 'stripe', avatar: '/avatars/james.png' },
+  { axis: 'customers', name: 'Sofia', role: 'Head of Customer Success', traits: ['empathetic', 'data-driven', 'retention-obsessed', 'hears churn early'], watches: 'cancellations, pre-churn behaviour, health-score and NPS drops', model: 'claude-haiku-4-5', source: 'scorecard', avatar: '/avatars/sofia.png' },
+  { axis: 'comms', name: 'Marcus', role: 'Chief of Staff (gatekeeper)', traits: ['discerning', 'protects your attention', 'politically astute', 'fast triage'], watches: 'investor/VIP inbound, time-sensitive external asks, team friction', model: 'claude-sonnet-4-6', source: 'scorecard', avatar: '/avatars/marcus.png' },
+  { axis: 'meetings', name: 'Priya', role: 'Executive Assistant', traits: ['meticulous', 'never drops a commitment', 'deadline-aware', 'reads subtext'], watches: 'commitments made, deadlines, risks and competitor mentions in meetings', model: 'claude-sonnet-4-6', source: 'granola', avatar: '/avatars/priya.png' },
+  { axis: 'ops', name: 'David', role: 'Head of Operations', traits: ['reliability-first', 'process-minded', 'watches quiet failures', 'unflappable'], watches: 'uptime/incidents, hiring and people-runway, process breakdowns', model: 'claude-haiku-4-5', source: 'scorecard', avatar: '/avatars/david.png' }
 ];
 
 export const DEMO_DECISIONS = [

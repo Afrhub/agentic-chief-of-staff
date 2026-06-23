@@ -11,6 +11,7 @@ interface Agent {
   watches: string;
   model: string | null;
   source: string;
+  avatar?: string;
 }
 
 // Pretty model label — drop the vendor prefix noise for the UI.
@@ -53,7 +54,17 @@ const Fleet: React.FC<{ founderId: string }> = ({ founderId }) => {
             <div className="fleet-card" key={a.axis}>
               <div className="fleet-card__top">
                 <span className="fleet-card__avatar" data-axis={a.axis} aria-hidden="true">
-                  {a.name.charAt(0)}
+                  {a.avatar && (
+                    <img
+                      className="fleet-card__photo"
+                      src={a.avatar}
+                      alt=""
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <span className="fleet-card__initial">{a.name.charAt(0)}</span>
                 </span>
                 <div className="fleet-card__who">
                   <span className="fleet-card__name">{a.name}</span>

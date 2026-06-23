@@ -28,6 +28,8 @@
 .fleet-card__top { display: flex; align-items: center; gap: 11px; }
 
 .fleet-card__avatar {
+  position: relative;
+  overflow: hidden;
   flex: 0 0 auto;
   width: 38px;
   height: 38px;
@@ -39,6 +41,14 @@
   font-size: 1.05rem;
   color: #fff;
   background: var(--violet);
+}
+/* photo overlays the initial when it loads; onError hides it -> initial shows */
+.fleet-card__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 /* one colour per axis so the team reads at a glance */
 .fleet-card__avatar[data-axis='money'] { background: var(--emerald); }

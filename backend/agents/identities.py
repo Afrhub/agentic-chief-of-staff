@@ -92,6 +92,9 @@ def fleet_meta() -> list:
             "axis": axis, "name": r["name"], "role": r["role"],
             "traits": r["traits"], "watches": r["watches"],
             "model": model, "source": source,
+            # Avatar lives in the frontend's static assets; path derives from the
+            # name. Missing file -> the UI falls back to the initial (see Fleet.tsx).
+            "avatar": f"/avatars/{r['name'].lower()}.png",
         })
     return out
 
@@ -107,4 +110,5 @@ if __name__ == "__main__":
     assert meta["money"]["source"] == "stripe", meta["money"]
     assert meta["meetings"]["source"] == "granola", meta["meetings"]
     assert meta["customers"]["source"] == "scorecard", meta["customers"]  # no MCP yet
+    assert meta["money"]["avatar"] == "/avatars/james.png", meta["money"]
     print("identities self-check ok:", [m["name"] for m in fleet_meta()])
