@@ -45,8 +45,12 @@ def main():
     if not HDR["x-api-key"]:
         sys.exit("Set ANTHROPIC_API_KEY first (see this file's docstring).")
 
-    env = _create("environments", _load("environment.yaml"))
-    print(f"DCERN_ENV_ID={env['id']}")
+    env_id = os.environ.get("DCERN_ENV_ID")
+    if env_id:
+        print(f"DCERN_ENV_ID={env_id}  (reused existing — no duplicate environment)")
+    else:
+        env_id = _create("environments", _load("environment.yaml"))["id"]
+        print(f"DCERN_ENV_ID={env_id}")
 
     ids = []
     for axis in AXES:

@@ -1,6 +1,6 @@
 # dCern Ops-axis agent. ant beta:agents create < this --transform id -r ; set OPS_AGENT_ID
 name: dCern Ops Agent
-model: claude-opus-4-8   # or claude-haiku-4-5 for cheap high-frequency scanning
+model: claude-haiku-4-5   # cheap scanner — reads structured metrics (numbers, not nuance)
 system: |
   You are dCern's OPS-axis analyst (product/engineering health). Decide whether
   there is a decision-worthy operational signal — an incident, error-rate or
