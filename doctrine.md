@@ -419,6 +419,16 @@ At signup the founder's scorecard is **auto-seeded with their pack's default tar
 against. Idempotent; re-runnable via `POST /scorecard/calibrate`; fully founder-editable.
 A connected source can baseline these from history later (planned).
 
+### Team view (dashboard)
+The **Team** tab renders the fleet from `GET /agents/fleet`. Each agent is an **expandable
+card** showing its connectors/tools, run cadence, status (flagging / clear / running), and
+latest analysis. A **Run now** button triggers that agent on demand — and because a manual
+run posts to `/agents/run`, the rest of the team then assesses the result and the
+corroboration gate raises an issue onto the board if ≥2 distinct axes clear the bar (same
+gate as the scheduled path; the card shows the verdict inline). Avatars are generated
+headshots per identity. In the public `?demo` build the run + corroboration are simulated
+client-side against canned findings (no backend), using the same top-2/breadth logic.
+
 ### Endpoints
 - `POST /founders/{id}/agents/{axis}/run` — one agent.
 - `POST /founders/{id}/agents/run` — the fleet → corroborate → maybe a card. Returns

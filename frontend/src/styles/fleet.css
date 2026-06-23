@@ -25,7 +25,82 @@
 }
 .fleet-card:hover { transform: translateY(-3px); border-color: var(--hair-strong); }
 
-.fleet-card__top { display: flex; align-items: center; gap: 11px; }
+.fleet-card__top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fleet-status {
+  margin-left: auto;
+  font-size: 0.64rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--hair);
+  color: var(--text-faint);
+}
+.fleet-status--flagging { color: var(--amber); border-color: color-mix(in oklab, var(--amber) 40%, transparent); }
+.fleet-status--clear { color: var(--emerald); border-color: color-mix(in oklab, var(--emerald) 35%, transparent); }
+.fleet-status--running { color: var(--violet); border-color: color-mix(in oklab, var(--violet) 45%, transparent); }
+
+.fleet-card__chev { color: var(--text-faint); font-size: 0.8rem; width: 12px; text-align: center; }
+
+.fleet-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+}
+.fleet-detail__row { display: flex; flex-direction: column; gap: 5px; }
+.fleet-detail__val { color: var(--text-soft); font-size: 0.84rem; line-height: 1.45; }
+.fleet-detail__val strong { color: var(--text); font-weight: 650; }
+.fleet-detail__muted { color: var(--text-faint); font-size: 0.8rem; }
+
+.fleet-run {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--primary-border, var(--hair-strong));
+  background: var(--primary-bg, var(--chip-bg-strong));
+  color: var(--primary-fg, var(--text));
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease), opacity 0.15s var(--ease);
+}
+.fleet-run:hover:not(:disabled) { transform: translateY(-1px); }
+.fleet-run:disabled { opacity: 0.6; cursor: progress; }
+
+.fleet-team {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+  padding: 10px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--hair);
+  background: var(--chip-bg);
+}
+.fleet-team strong { color: var(--text); }
+.fleet-team.is-raised {
+  border-color: color-mix(in oklab, var(--rose) 45%, transparent);
+  background: color-mix(in oklab, var(--rose) 10%, transparent);
+}
+.fleet-team.is-raised strong { color: var(--rose); }
+.fleet-team.is-clear { border-color: color-mix(in oklab, var(--emerald) 30%, transparent); }
 
 .fleet-card__avatar {
   position: relative;

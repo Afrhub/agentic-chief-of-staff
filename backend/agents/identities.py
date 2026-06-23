@@ -79,19 +79,21 @@ def fleet_meta() -> list:
     the shape the dashboard's team view renders."""
     out = []
     for axis, r in ROSTER.items():
-        model, source = None, "scorecard"
+        model, connectors = None, []
         try:
             y = yaml.safe_load(open(os.path.join(_HERE, f"{axis}.agent.yaml")))
             model = y.get("model")
-            servers = y.get("mcp_servers") or []
-            if servers:
-                source = servers[0].get("name", source)
+            connectors = [s.get("name") for s in (y.get("mcp_servers") or []) if s.get("name")]
         except Exception:
-            pass  # missing/unparseable YAML -> identity still renders, source falls back
+            pass  # missing/unparseable YAML -> identity still renders, connectors empty
         out.append({
             "axis": axis, "name": r["name"], "role": r["role"],
             "traits": r["traits"], "watches": r["watches"],
-            "model": model, "source": source,
+            "model": model,
+            "source": connectors[0] if connectors else "scorecard",  # primary (Team-card label)
+            "connectors": connectors,            # every MCP server this agent declares
+            "tools": ["agent toolset (bash · files)"] + [f"{c} (MCP)" for c in connectors],
+            "cadence": "Hourly",                 # design cadence; on-demand until 24/7 deployment is on
             # Avatar lives in the frontend's static assets; path derives from the
             # name. Missing file -> the UI falls back to the initial (see Fleet.tsx).
             "avatar": f"/avatars/{r['name'].lower()}.png",
