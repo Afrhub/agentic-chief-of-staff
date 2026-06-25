@@ -53,7 +53,11 @@ def main():
         print(f"DCERN_ENV_ID={env_id}")
 
     sys.path.insert(0, HERE)
-    from identities import persona_for  # same dir; gives each agent its human voice
+    from identities import persona_for, aggregator_server
+
+    agg = aggregator_server()  # operator-wide MCP aggregator (Composio/Zapier/Pipedream)
+    if agg:
+        print(f"# aggregator MCP enabled: '{agg['name']}' (url hidden — may embed a secret)")
 
     ids = []
     for axis in AXES:
@@ -61,6 +65,9 @@ def main():
         persona = persona_for(axis)
         if persona:  # prepend the identity (James/Sofia/...) without touching the JSON contract
             spec["system"] = persona + "\n\n" + spec.get("system", "")
+        if agg:  # give every agent the aggregator alongside its per-axis MCP
+            spec.setdefault("mcp_servers", []).append({"type": "url", "name": agg["name"], "url": agg["url"]})
+            spec.setdefault("tools", []).append({"type": "mcp_toolset", "mcp_server_name": agg["name"]})
         a = _create("agents", spec)
         ids.append(a["id"])
         print(f"{axis.upper()}_AGENT_ID={a['id']}")

@@ -405,6 +405,13 @@ servers: Slack (`https://mcp.slack.com/mcp`), Gmail (`https://gmailmcp.googleapi
 and Google Calendar (`https://calendarmcp.googleapis.com/mcp/v1`), all OAuth via the vault.
 An axis can declare any number of `mcp_servers`; the Team view labels it by the first.
 
+**MCP aggregator (optional, operator-wide):** set `DCERN_AGGREGATOR_MCP_URL` (https) to a
+hosted aggregator — Composio (`connect.composio.dev/mcp`), Zapier (`mcp.zapier.com/…`), or
+Pipedream (`mcp.pipedream.com/…`) — and `create_agents.py` gives **every** agent that one
+extra MCP server, fanning out to thousands of tools without hand-wiring each. Auth via the
+vault; the URL is operator-set (not founder input) and never logged. Single source of truth
+is `identities.aggregator_server()`; see `backend/agents/AGGREGATOR.md`.
+
 ### Corroboration gate (refined 2026-06-23)
 A card surfaces only when **≥2 distinct axes** agree **and** confidence clears the bar.
 Confidence is judged on the **strongest signal per distinct type (top-2)** — so moderate

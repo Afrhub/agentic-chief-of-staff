@@ -74,10 +74,24 @@ def persona_for(axis: str) -> str:
     return r["persona"] if r else ""
 
 
+def aggregator_server():
+    """Operator-configured MCP aggregator (Composio / Zapier / Pipedream / any hosted
+    MCP) that fans out to thousands of tools through one endpoint. Returns {name, url}
+    when DCERN_AGGREGATOR_MCP_URL is set to an https URL, else None. It's operator-set
+    (env), not founder input — but we still require https. Single source of truth used
+    by create_agents.py (injection) and fleet_meta (display)."""
+    url = os.getenv("DCERN_AGGREGATOR_MCP_URL", "").strip()
+    if not url.startswith("https://"):
+        return None  # unset or non-https -> disabled (no plaintext aggregator endpoints)
+    name = os.getenv("DCERN_AGGREGATOR_NAME", "aggregator").strip() or "aggregator"
+    return {"name": name, "url": url}
+
+
 def fleet_meta() -> list:
     """Roster + each agent's model and live data source (read from its YAML) —
     the shape the dashboard's team view renders."""
     out = []
+    agg = aggregator_server()
     for axis, r in ROSTER.items():
         model, connectors = None, []
         try:
@@ -86,6 +100,8 @@ def fleet_meta() -> list:
             connectors = [s.get("name") for s in (y.get("mcp_servers") or []) if s.get("name")]
         except Exception:
             pass  # missing/unparseable YAML -> identity still renders, connectors empty
+        if agg and agg["name"] not in connectors:
+            connectors = connectors + [agg["name"]]  # operator-wide MCP aggregator
         out.append({
             "axis": axis, "name": r["name"], "role": r["role"],
             "traits": r["traits"], "watches": r["watches"],
@@ -115,4 +131,13 @@ if __name__ == "__main__":
     assert meta["comms"]["source"] == "slack", meta["comms"]
     assert meta["ops"]["source"] == "datadog", meta["ops"]
     assert meta["money"]["avatar"] == "/avatars/james.png", meta["money"]
+    # aggregator slot: off by default, https-only, reflected in connectors when on
+    assert aggregator_server() is None
+    os.environ["DCERN_AGGREGATOR_MCP_URL"] = "http://insecure/mcp"
+    assert aggregator_server() is None, "non-https must be refused"
+    os.environ["DCERN_AGGREGATOR_MCP_URL"] = "https://connect.composio.dev/mcp"
+    assert aggregator_server()["name"] == "aggregator"
+    assert "aggregator" in fleet_meta()[0]["connectors"]
+    del os.environ["DCERN_AGGREGATOR_MCP_URL"]
+    assert aggregator_server() is None and "aggregator" not in fleet_meta()[0]["connectors"]
     print("identities self-check ok:", [m["name"] for m in fleet_meta()])
