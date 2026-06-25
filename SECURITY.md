@@ -25,6 +25,21 @@ Top 10 (2021). Last reviewed 2026-06-23.
 
 Verified: `backend/live_run.py` 48/48 (incl. headers present, oversized input rejected, auth `429` under brute force).
 
+## Code-review findings (2026-06-23 follow-up) — fixed
+
+A diff/code scan after the initial pass surfaced these, now fixed:
+
+| # | OWASP | Issue | Fix |
+|---|-------|-------|-----|
+| 5 | A01/A07 | **`POST /slack/actions` was unauthenticated** — took a raw payload and changed *any* alert's status (decide/delegate/dismiss) by id, with no signature, session, or founder binding. | Now verifies Slack's request signature (`_verify_slack`, like `/slack/events`) + parses the real form-encoded payload; forged actions → 401. |
+| 6 | A10 | **SSRF** — a founder's integration `config` could set `base_url` (Granola) / `mcp_server`, fetched server-side → reach `169.254.169.254` (cloud metadata) or internal hosts. | `_safe_external_url` rejects non-HTTP(S) and hosts resolving to private/loopback/link-local/reserved/multicast IPs; applied at both fetch sites. |
+| 7 | A04 | **Cost-DoS** — `/agents/run` (5 managed-agent sessions = real $) sat in the loose 240/min bucket. | Dedicated buckets: `/agents/*` 20/min, webhooks 90/min, auth 12/5min. |
+| — | — | Confirmed `/slack/events` + `/whatsapp/events` already verify signatures; the session gate is IDOR-safe. | (no change) |
+
+Verified: `live_run.py` 51/51.
+
+**Still flagged:** `_verify_slack` **fails open** when `SLACK_SIGNING_SECRET` is unset (dev convenience) — **set it on Render before the Slack bot is public**. Rate-limit client-IP comes from `X-Forwarded-For` (spoofable to evade per-IP limits) — acceptable behind Render's proxy; front it with a CDN/WAF to harden.
+
 ## Recommended next (not yet done)
 
 | Priority | OWASP | Item | Why / how |

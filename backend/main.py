@@ -14,6 +14,8 @@ import time
 import threading
 import json
 import base64
+import socket
+import ipaddress
 import httpx
 from urllib.parse import parse_qsl
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -62,8 +64,17 @@ async def _require_session(request: Request, call_next):
 # tight bucket (brute-force guard), everything else a generous one.
 _RL_LOCK = threading.Lock()
 _RL_HITS: dict = {}
-_RL_RULES = [("/auth/", 12, 300),   # 12 requests / 5 min on auth
-             ("/", 240, 60)]        # 240 requests / min elsewhere
+
+
+def _rl_rule(path: str):
+    """(limit, window_seconds, bucket) per path class."""
+    if path.startswith("/auth/"):
+        return 12, 300, "auth"                          # brute-force guard
+    if path.startswith("/slack/") or path.startswith("/whatsapp/"):
+        return 90, 60, "hook"                           # inbound webhooks
+    if "/agents/" in path:
+        return 20, 60, "agents"                         # EXPENSIVE — managed-agent inference $$
+    return 240, 60, "gen"
 
 
 def _client_ip(request: Request) -> str:
@@ -77,8 +88,8 @@ async def _rate_limit(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
     path = request.url.path
-    limit, window = next((l, w) for pre, l, w in _RL_RULES if path.startswith(pre))
-    key = f"{_client_ip(request)}:{'auth' if path.startswith('/auth/') else 'gen'}"
+    limit, window, bucket = _rl_rule(path)
+    key = f"{_client_ip(request)}:{bucket}"
     now = time.time()
     with _RL_LOCK:
         hits = [t for t in _RL_HITS.get(key, []) if t > now - window]
@@ -404,13 +415,37 @@ def _collect_slack_signals(founder_id: str, state: IntegrationState, db: Session
     return signals
 
 
+def _safe_external_url(url: str) -> str:
+    """SSRF guard for user-supplied URLs fetched server-side. Rejects non-HTTP(S)
+    and hosts that resolve to private / loopback / link-local / reserved IPs (incl.
+    cloud metadata 169.254.169.254). Raises ValueError if unsafe.
+    ponytail: resolve-then-check leaves a small DNS-rebinding window — fine as a
+    first layer; a vetted egress proxy would close it."""
+    from urllib.parse import urlparse
+    p = urlparse(url or "")
+    if p.scheme not in ("http", "https") or not p.hostname:
+        raise ValueError("url must be http(s) with a host")
+    try:
+        addrs = {info[4][0] for info in socket.getaddrinfo(p.hostname, None)}
+    except Exception:
+        raise ValueError("host does not resolve")
+    for a in addrs:
+        ip = ipaddress.ip_address(a)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            raise ValueError(f"host resolves to a blocked address ({ip})")
+    return url
+
+
 def _collect_granola_signals(founder_id: str, state: IntegrationState, db: Session) -> List[AlertSignal]:
     """Collect decision/action/risk signals from recent Granola meeting notes."""
     signals: List[AlertSignal] = []
-    adapter = GranolaAdapter(
-        state.access_token,
-        (state.config or {}).get("base_url") or "https://public-api.granola.ai/v1",
-    )
+    base_url = (state.config or {}).get("base_url") or "https://public-api.granola.ai/v1"
+    try:
+        base_url = _safe_external_url(base_url)
+    except ValueError as e:
+        logger.error(f"granola base_url blocked (SSRF guard): {e}")
+        return []
+    adapter = GranolaAdapter(state.access_token, base_url)
     for note in adapter.scan_recent_notes():
         signals.append(AlertSignal(
             type=note["kind"],
@@ -477,7 +512,7 @@ def evaluate_all_founders():
                     try:
                         from integrations.mcp_adapter import collect as mcp_collect
                         collected.extend(mcp_collect(
-                            cfg["mcp_server"], state.access_token, cfg["tool"],
+                            _safe_external_url(cfg["mcp_server"]), state.access_token, cfg["tool"],
                             cfg.get("maps_to", "external_signal"),
                             cfg.get("confidence", 0.8), cfg.get("args"),
                         ))
@@ -1438,9 +1473,18 @@ async def whatsapp_events(request: Request, background: BackgroundTasks, db: Ses
 
 
 @app.post("/slack/actions")
-def slack_action(payload: dict, db: Session = Depends(get_db)):
-    """Handle Slack button actions (Decide/Delegate/Dismiss from a Slack alert)."""
+async def slack_action(request: Request, db: Session = Depends(get_db)):
+    """Handle Slack button actions (Decide/Delegate/Dismiss). Slack's request
+    signature is the trust boundary — this route is NOT session-gated, so we must
+    verify it; otherwise anyone could mutate any alert's status by id. Slack sends
+    interactive payloads form-encoded as `payload=<json>`."""
+    raw = await request.body()
+    if not _verify_slack(raw, request.headers.get("X-Slack-Request-Timestamp", ""),
+                         request.headers.get("X-Slack-Signature", "")):
+        return JSONResponse({"ok": False, "error": "bad_signature"}, status_code=401)
     try:
+        from urllib.parse import parse_qs
+        payload = json.loads(parse_qs(raw.decode()).get("payload", ["{}"])[0])
         action = payload.get("actions", [{}])[0]
         action_type = action.get("action_id", "").split("_")[0]
         alert_id = action.get("value", "").split("_")[-1]

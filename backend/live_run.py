@@ -203,5 +203,19 @@ with TestClient(main.app) as c:
     codes = [c.post("/auth/login", json={"email": "nope@y.co", "password": "whatever8"}).status_code for _ in range(15)]
     check("auth brute-force is rate limited (429 seen)", 429 in codes)
 
+    print("==> 18. Security-review fixes — webhook signature + SSRF guard")
+    os.environ["SLACK_SIGNING_SECRET"] = "test-secret"  # activate the signature check
+    check("forged /slack/actions rejected (401)",
+          c.post("/slack/actions", data="payload=%7B%7D").status_code == 401)
+    blocked = 0
+    for bad in ["http://169.254.169.254/latest/meta-data/", "http://127.0.0.1/", "http://10.0.0.5/", "file:///etc/passwd"]:
+        try:
+            main._safe_external_url(bad)
+        except ValueError:
+            blocked += 1
+    check("SSRF guard blocks metadata/loopback/private/non-http", blocked == 4)
+    check("SSRF guard allows a public address",
+          main._safe_external_url("http://93.184.216.34/x") == "http://93.184.216.34/x")
+
 print(f"\n{'ALL ' + str(len(passed)) + ' CHECKS PASSED' if not failed else str(len(failed)) + ' FAILED: ' + str(failed)}")
 raise SystemExit(1 if failed else 0)
