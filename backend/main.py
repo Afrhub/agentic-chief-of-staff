@@ -1351,12 +1351,21 @@ def discard_draft(founder_id: str, draft_id: str, db: Session = Depends(get_db))
     return {"id": draft.id, "status": "discarded"}
 
 
+def _is_production() -> bool:
+    """Render sets RENDER=true automatically; DCERN_ENV=production forces it anywhere.
+    Used to fail webhook signature checks CLOSED in prod, open in dev."""
+    return os.getenv("DCERN_ENV", "").lower() == "production" or bool(os.getenv("RENDER"))
+
+
 def _verify_slack(raw: bytes, ts: str, sig: str) -> bool:
     """Verify Slack's request signature (trust boundary — don't skip in prod)."""
     secret = os.getenv("SLACK_SIGNING_SECRET")
     if not secret:
-        logger.warning("SLACK_SIGNING_SECRET unset — skipping signature check (set it in prod)")
-        return True  # ponytail: dev fallback only; required once the bot is public
+        if _is_production():
+            logger.error("SLACK_SIGNING_SECRET unset in production — rejecting Slack request")
+            return False  # fail closed in prod
+        logger.warning("SLACK_SIGNING_SECRET unset — skipping signature check (dev only)")
+        return True
     try:
         if abs(time.time() - int(ts)) > 300:
             return False
@@ -1416,8 +1425,11 @@ def _verify_twilio(url: str, params: dict, signature: str) -> bool:
     HMAC-SHA1(auth_token, url + concatenated sorted key+value pairs))."""
     token = os.getenv("TWILIO_AUTH_TOKEN")
     if not token:
-        logger.warning("TWILIO_AUTH_TOKEN unset — skipping WhatsApp signature check (set it in prod)")
-        return True  # ponytail: dev fallback only; required once the number is live
+        if _is_production():
+            logger.error("TWILIO_AUTH_TOKEN unset in production — rejecting WhatsApp request")
+            return False  # fail closed in prod
+        logger.warning("TWILIO_AUTH_TOKEN unset — skipping WhatsApp signature check (dev only)")
+        return True
     base = url + "".join(f"{k}{params[k]}" for k in sorted(params))
     mac = base64.b64encode(hmac.new(token.encode(), base.encode(), hashlib.sha1).digest()).decode()
     return hmac.compare_digest(mac, signature or "")

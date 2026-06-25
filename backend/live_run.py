@@ -216,6 +216,12 @@ with TestClient(main.app) as c:
     check("SSRF guard blocks metadata/loopback/private/non-http", blocked == 4)
     check("SSRF guard allows a public address",
           main._safe_external_url("http://93.184.216.34/x") == "http://93.184.216.34/x")
+    # webhook signature must fail CLOSED in production when the secret is absent
+    del os.environ["SLACK_SIGNING_SECRET"]
+    os.environ["DCERN_ENV"] = "production"
+    check("prod + no signing secret -> /slack/actions fails closed (401)",
+          c.post("/slack/actions", data="payload=%7B%7D").status_code == 401)
+    del os.environ["DCERN_ENV"]
 
 print(f"\n{'ALL ' + str(len(passed)) + ' CHECKS PASSED' if not failed else str(len(failed)) + ' FAILED: ' + str(failed)}")
 raise SystemExit(1 if failed else 0)
