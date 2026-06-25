@@ -222,6 +222,9 @@ with TestClient(main.app) as c:
     check("prod + no signing secret -> /slack/actions fails closed (401)",
           c.post("/slack/actions", data="payload=%7B%7D").status_code == 401)
     del os.environ["DCERN_ENV"]
+    # per-account login throttle — IP-independent, so XFF spoofing can't bypass it
+    main._LOGIN_FAILS["victim@throttle.test"] = [9e18] * 10  # 10 recent failures
+    check("per-email login throttle locks an account after 10 fails", main._login_locked("victim@throttle.test"))
 
 print(f"\n{'ALL ' + str(len(passed)) + ' CHECKS PASSED' if not failed else str(len(failed)) + ' FAILED: ' + str(failed)}")
 raise SystemExit(1 if failed else 0)

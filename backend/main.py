@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import Optional, List
 from datetime import datetime
 import logging
@@ -577,13 +578,32 @@ def signup(body: AuthRequest, db: Session = Depends(get_db)):
     return {"founder_id": f.id, "token": token, "pack": pack_id}
 
 
+# Per-account login throttle — keyed by EMAIL, so it can't be bypassed by spoofing
+# X-Forwarded-For the way a per-IP limit can. Locks the account after repeated fails.
+_LOGIN_FAILS: dict = {}
+_LOGIN_MAX, _LOGIN_WINDOW = 10, 900  # 10 failures / 15 min -> locked
+
+
+def _login_locked(email: str) -> bool:
+    now = time.time()
+    with _RL_LOCK:
+        fails = [t for t in _LOGIN_FAILS.get(email, []) if t > now - _LOGIN_WINDOW]
+        _LOGIN_FAILS[email] = fails
+        return len(fails) >= _LOGIN_MAX
+
+
 @app.post("/auth/login")
 def login(body: AuthRequest, db: Session = Depends(get_db)):
     """Verify credentials → rotate + return a fresh session token."""
     email = (body.email or "").strip().lower()
+    if _login_locked(email):
+        raise HTTPException(status_code=429, detail="Too many failed attempts — try again later")
     f = db.query(Founder).filter(Founder.email == email).first()
     if not f or not f.password_hash or not verify_password(body.password, f.password_hash):
+        with _RL_LOCK:
+            _LOGIN_FAILS.setdefault(email, []).append(time.time())
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    _LOGIN_FAILS.pop(email, None)  # clear on success
     token = new_token()
     f.session_token = token  # rotate on each login (invalidates the prior token)
     db.commit()
@@ -626,7 +646,11 @@ def upsert_founder(founder_id: str, body: FounderRequest, db: Session = Depends(
         f.whatsapp_number = body.whatsapp_number
     if body.pack is not None:
         f.pack = get_pack(body.pack).get("id")  # validated
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="That email is already in use")
     return {"id": founder_id, "status": "ok"}
 
 
@@ -1394,18 +1418,16 @@ async def slack_events(request: Request, background: BackgroundTasks, db: Sessio
     """Slack Events API: a founder DMs the bot → reply with the chief of staff.
     Reachable with no browser open — the CoS lives in Slack."""
     raw = await request.body()
-    payload = json.loads(raw or b"{}")
-
-    # Slack endpoint setup handshake
-    if payload.get("type") == "url_verification":
-        return {"challenge": payload.get("challenge")}
-
     if not _verify_slack(
         raw,
         request.headers.get("X-Slack-Request-Timestamp", ""),
         request.headers.get("X-Slack-Signature", ""),
     ):
         raise HTTPException(status_code=403, detail="bad signature")
+    payload = json.loads(raw or b"{}")
+    # Slack endpoint setup handshake (also signed — verified above)
+    if payload.get("type") == "url_verification":
+        return {"challenge": payload.get("challenge")}
 
     event = payload.get("event", {})
     # Real human message only — ignore the bot's own posts and edits/joins.
@@ -1470,7 +1492,12 @@ async def whatsapp_events(request: Request, background: BackgroundTasks, db: Ses
     replies in the background to avoid Twilio's webhook timeout."""
     raw = await request.body()
     form = dict(parse_qsl(raw.decode()))  # stdlib parse — no python-multipart dep
-    if not _verify_twilio(str(request.url), form, request.headers.get("X-Twilio-Signature", "")):
+    # Reconstruct the PUBLIC url Twilio signed — behind Render's TLS proxy request.url
+    # is the internal http://…:8000, which wouldn't match the https signature.
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host", request.url.netloc)
+    public_url = f"{proto}://{host}{request.url.path}" + (f"?{request.url.query}" if request.url.query else "")
+    if not _verify_twilio(public_url, form, request.headers.get("X-Twilio-Signature", "")):
         raise HTTPException(status_code=403, detail="bad signature")
 
     sender = form.get("From", "")           # "whatsapp:+14155551234"

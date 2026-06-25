@@ -126,7 +126,7 @@ class IntegrationState(Base):
     # Integration info
     service = Column(String, nullable=False)  # stripe, slack, email, calendar, salesforce
     access_token = Column(EncryptedString, nullable=False)  # encrypted at rest (DCERN_SECRET_KEY)
-    refresh_token = Column(String, nullable=True)
+    refresh_token = Column(EncryptedString, nullable=True)  # encrypted at rest (higher-value secret)
 
     # Sync state
     last_sync_at = Column(DateTime, nullable=True)

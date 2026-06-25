@@ -40,6 +40,17 @@ Verified: `live_run.py` 51/51.
 
 **Still flagged:** `_verify_slack` **fails open** when `SLACK_SIGNING_SECRET` is unset (dev convenience) — **set it on Render before the Slack bot is public**. Rate-limit client-IP comes from `X-Forwarded-For` (spoofable to evade per-IP limits) — acceptable behind Render's proxy; front it with a CDN/WAF to harden.
 
+### Independent review pass (subagent) — additional fixes
+
+| OWASP | Issue | Fix |
+|-------|-------|-----|
+| A07 | **Per-IP auth limit bypassable via `X-Forwarded-For` spoofing** (no `--proxy-headers`; leftmost XFF is client-set) → defeats the credential-stuffing guard. | Added a **per-account (email) login throttle** — IP-independent, so spoofing XFF can't bypass it: 10 failures / 15 min per email → `429`, cleared on success. (Per-IP limits stay best-effort; front with a CDN/WAF that sets a trusted client-IP header to harden further.) |
+| A02 | **`refresh_token` stored plaintext** — the higher-value Gmail secret, missed by the access_token work. | Now `EncryptedString` too. |
+| A05 | **Twilio webhook 403s in prod** — `_verify_twilio` signed the internal `http://…:8000` URL, not the public `https` URL Twilio hashed. | Reconstruct the public URL from `X-Forwarded-Proto/Host`. |
+| — | `upsert_founder` email collision → unhandled 500; `/slack/events` parsed the body before verifying. | 409 on collision; verify signature first. |
+
+Verified: `live_run.py` 53/53. The reviewer also confirmed sound: the session gate (no bypass / constant-time), the SSRF guard (resolves-then-classifies, catches decimal/hex/localhost/IPv4-mapped), the corroboration gate math, calibration-reset scoping, no mass-assignment in `upsert_founder`, and no raw SQL.
+
 ## Recommended next (not yet done)
 
 | Priority | OWASP | Item | Why / how |
