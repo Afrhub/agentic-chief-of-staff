@@ -1,0 +1,51 @@
+name: CI
+
+# Gate every push/PR to main BEFORE it auto-deploys (Render + Netlify deploy on push).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Test harness (live_run.py — end-to-end checks)
+        run: python live_run.py            # self-contained: sqlite + stubbed LLM; exits 1 on any failure
+      - name: Dependency audit (pip-audit)
+        run: pip install pip-audit && pip-audit
+        continue-on-error: true            # surfaces CVEs without blocking the deploy
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Type-check
+        run: npx tsc --noEmit -p tsconfig.json
+      - name: Build (prod settings)
+        run: CI=false INLINE_RUNTIME_CHUNK=false npm run build
+      - name: Dependency audit (npm)
+        run: npm audit --audit-level=high
+        continue-on-error: true
